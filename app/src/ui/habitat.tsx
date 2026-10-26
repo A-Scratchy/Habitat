@@ -5,9 +5,14 @@ import { db } from '../data/db';
 import { readLocal, writeLocal } from '../data/local';
 import { DAY, startOfDay, startOfWeek } from '../domain/dates';
 import type { ViewContext } from '../domain/selection';
-import type { Member, Tend, Win } from '../domain/types';
+import { byRoomOrder, type Member, type Tend, type Win, type Room } from '../domain/types';
 
 export interface Habitat {
+  /** In display order. */
+  rooms: Room[];
+  roomById: Map<string, Room>;
+  /** A room's name, or '' for an unknown id. Handy for search and labels. */
+  roomName(id: string): string;
   tends: Tend[];
   members: Member[];
   /** Wins since the start of this week (and at least since yesterday). */
@@ -55,6 +60,7 @@ interface Toast {
 export function HabitatProvider({ children, loading }: { children: (state: 'loading' | 'empty' | 'ready') => ReactNode; loading?: ReactNode }) {
   const now = useNow();
   const since = Math.min(startOfWeek(now), startOfDay(now) - DAY);
+  const rooms = useLiveQuery(() => db.rooms.toArray(), []);
   const tends = useLiveQuery(() => db.tends.toArray(), []);
   const members = useLiveQuery(() => db.members.toArray(), []);
   const wins = useLiveQuery(() => db.wins.where('at').aboveOrEqual(since).toArray(), [since]);
@@ -94,11 +100,24 @@ export function HabitatProvider({ children, loading }: { children: (state: 'load
   );
 
   const value = useMemo<Habitat | null>(() => {
-    if (!tends || !members || !wins) return null;
+    if (!rooms || !tends || !members || !wins) return null;
     const memberById = new Map(members.map((m) => [m.id, m]));
+    const roomById = new Map(rooms.map((r) => [r.id, r]));
     const me = meId ? memberById.get(meId) : undefined;
-    return { tends, members, wins, me, ctx: { now, memberId: me?.id }, memberById, setMe, complete };
-  }, [tends, members, wins, meId, now, setMe, complete]);
+    return {
+      rooms: [...rooms].sort(byRoomOrder),
+      roomById,
+      roomName: (id: string) => roomById.get(id)?.name ?? '',
+      tends,
+      members,
+      wins,
+      me,
+      ctx: { now, memberId: me?.id },
+      memberById,
+      setMe,
+      complete,
+    };
+  }, [rooms, tends, members, wins, meId, now, setMe, complete]);
 
   if (!value) return <>{loading}</>;
   const state = value.tends.length === 0 && value.members.length === 0 ? 'empty' : 'ready';

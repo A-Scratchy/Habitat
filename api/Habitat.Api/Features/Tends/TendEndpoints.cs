@@ -11,16 +11,17 @@ using Microsoft.Extensions.Options;
 namespace Habitat.Api.Features.Tends;
 
 /// <summary>
-/// Everything a device may set on a habit or quest. Kind, Tier and Status are required: nothing is
-/// assumed. LastDoneAt and claims are not here: the server owns those.
+/// Everything a device may set on a habit or quest. Kind, room, Tier, Impact and Status are required:
+/// nothing is assumed. LastDoneAt and claims are not here: the server owns those.
 /// </summary>
 public record TendInput(
     TendKind? Kind,
     string Name,
-    string Room,
+    Guid? RoomId,
     string? Group,
     string? Description,
     EffortTier? Tier,
+    EcologicalImpact? Impact,
     EnergyTag[]? Energy,
     /// <summary>Required for habits; must be empty for quests.</summary>
     int? FrequencyDays,
@@ -61,7 +62,6 @@ public static class TendEndpoints
     {
         var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(t.Name) || t.Name.Length > 80) errors["name"] = ["Between 1 and 80 characters."];
-        if (string.IsNullOrWhiteSpace(t.Room) || t.Room.Length > 40) errors["room"] = ["Between 1 and 40 characters."];
         if (t.Group is { Length: > 40 }) errors["group"] = ["At most 40 characters."];
         if (t.Description is { Length: > TendRules.DescriptionMax }) errors["description"] = [$"At most {TendRules.DescriptionMax} characters."];
         if (t.Energy.Count != t.Energy.Distinct().Count()) errors["energy"] = ["No repeated tags."];
@@ -82,16 +82,19 @@ public static class TendEndpoints
     {
         var missing = new Dictionary<string, string[]>();
         if (input.Kind is null) missing["kind"] = ["Required: Habit or Quest."];
+        if (input.RoomId is null) missing["roomId"] = ["Required: the room it belongs to."];
+        if (input.Impact is null) missing["impact"] = ["Required: Small, Medium or Large."];
         if (input.Tier is null) missing["tier"] = ["Required: Sloth, Tortoise, Bee or Elephant."];
         if (input.Status is null) missing["status"] = ["Required: Active or Paused."];
         if (missing.Count > 0) return missing;
 
         t.Kind = input.Kind!.Value;
         t.Name = input.Name?.Trim() ?? "";
-        t.Room = input.Room?.Trim() ?? "";
+        t.RoomId = input.RoomId!.Value;
         t.Group = string.IsNullOrWhiteSpace(input.Group) ? null : input.Group.Trim();
         t.Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim();
         t.Tier = input.Tier!.Value;
+        t.Impact = input.Impact!.Value;
         t.Energy = [.. input.Energy ?? []];
         t.FrequencyDays = input.FrequencyDays;
         t.Status = input.Status!.Value;
@@ -103,6 +106,9 @@ public static class TendEndpoints
 
     private static async Task<bool> OwnerIsValid(HabitatDb db, Guid? ownerId) =>
         ownerId is null || await db.Members.AnyAsync(m => m.Id == ownerId && m.DeletedAt == null);
+
+    private static async Task<bool> RoomIsValid(HabitatDb db, Guid roomId) =>
+        await db.Rooms.AnyAsync(r => r.Id == roomId && r.DeletedAt == null);
 
     /// <summary>Finds a tend to write, creating it if new. Null means the id belongs elsewhere or was removed.</summary>
     private static async Task<(Tend? Tend, IResult? Error)> ForWrite(Guid id, HabitatDb db, ClaimsPrincipal principal, TendInput? creating)
@@ -123,7 +129,6 @@ public static class TendEndpoints
         Id = id,
         HouseholdId = householdId,
         Name = "",
-        Room = "",
         SeedLastDoneAt = input.SeedLastDoneAt,
         LastDoneAt = input.SeedLastDoneAt,
         CompletedAt = input.Kind == TendKind.Quest ? input.CompletedAt : null,
@@ -136,6 +141,7 @@ public static class TendEndpoints
 
         var errors = Apply(tend, input);
         if (!await OwnerIsValid(db, tend.OwnerMemberId)) errors["ownerMemberId"] = ["Not a member of this habitat."];
+        if (input.RoomId is not null && !await RoomIsValid(db, tend.RoomId)) errors["roomId"] = ["Not a room in this habitat."];
         if (errors.Count > 0) return TypedResults.ValidationProblem(errors);
 
         tend.UpdatedAt = clock.GetUtcNow();
@@ -144,7 +150,7 @@ public static class TendEndpoints
     }
 
     /// <summary>Kind isn't here on purpose: switching between habit and quest is a full PUT, so both sides' fields are given.</summary>
-    private static readonly HashSet<string> Patchable = ["name", "room", "group", "description", "tier", "energy", "frequencyDays", "status", "ownerMemberId"];
+    private static readonly HashSet<string> Patchable = ["name", "roomId", "group", "description", "tier", "impact", "energy", "frequencyDays", "status", "ownerMemberId"];
 
     private static async Task<IResult> Patch(Guid id, JsonElement body, ClaimsPrincipal principal, HabitatDb db, TimeProvider clock, IOptions<JsonOptions> json)
     {
@@ -166,7 +172,8 @@ public static class TendEndpoints
                 switch (prop.Name)
                 {
                     case "name": tend.Name = prop.Value.GetString()?.Trim() ?? ""; break;
-                    case "room": tend.Room = prop.Value.GetString()?.Trim() ?? ""; break;
+                    case "roomId": tend.RoomId = prop.Value.Deserialize<Guid>(options); break;
+                    case "impact": tend.Impact = prop.Value.Deserialize<EcologicalImpact>(options); break;
                     case "group": tend.Group = string.IsNullOrWhiteSpace(prop.Value.GetString()) ? null : prop.Value.GetString()!.Trim(); break;
                     case "description": tend.Description = string.IsNullOrWhiteSpace(prop.Value.GetString()) ? null : prop.Value.GetString()!.Trim(); break;
                     case "tier": tend.Tier = prop.Value.Deserialize<EffortTier>(options); break;
@@ -183,6 +190,7 @@ public static class TendEndpoints
         }
         foreach (var (k, v) in Validate(tend)) errors.TryAdd(k, v);
         if (!await OwnerIsValid(db, tend.OwnerMemberId)) errors["ownerMemberId"] = ["Not a member of this habitat."];
+        if (!await RoomIsValid(db, tend.RoomId)) errors["roomId"] = ["Not a room in this habitat."];
         if (errors.Count > 0) return TypedResults.ValidationProblem(errors);
 
         tend.UpdatedAt = clock.GetUtcNow();
@@ -210,6 +218,7 @@ public static class TendEndpoints
         var now = clock.GetUtcNow();
         var householdId = principal.HouseholdId();
         var memberIds = (await db.Members.Where(m => m.DeletedAt == null).Select(m => m.Id).ToListAsync()).ToHashSet();
+        var roomIds = (await db.Rooms.Where(r => r.DeletedAt == null).Select(r => r.Id).ToListAsync()).ToHashSet();
         var ids = req.Tends.Select(c => c.Id).ToArray();
         // One query for every id, including ones that turn out to belong elsewhere.
         var existing = await db.Tends.IgnoreQueryFilters().Where(t => ids.Contains(t.Id)).ToDictionaryAsync(t => t.Id);
@@ -230,6 +239,7 @@ public static class TendEndpoints
             }
             foreach (var (k, v) in Apply(tend, input)) errors[$"tends[{i}].{k}"] = v;
             if (tend.OwnerMemberId is { } owner && !memberIds.Contains(owner)) errors[$"tends[{i}].ownerMemberId"] = ["Not a member of this habitat."];
+            if (input.RoomId is { } room && !roomIds.Contains(room)) errors[$"tends[{i}].roomId"] = ["Not a room in this habitat."];
             tend.UpdatedAt = now;
             saved++;
         }

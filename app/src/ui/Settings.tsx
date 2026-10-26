@@ -64,7 +64,7 @@ function MembersAdmin() {
 }
 
 function DataAdmin() {
-  const { tends, members } = useHabitat();
+  const { tends, members, rooms } = useHabitat();
   const [replace, setReplace] = useState(true);
   const [mockDates, setMockDates] = useState(true);
   const [report, setReport] = useState<string[]>();
@@ -89,7 +89,7 @@ function DataAdmin() {
   };
 
   const exportCsv = () => {
-    const url = URL.createObjectURL(new Blob([toTendsCsv(tends, members)], { type: 'text/csv' }));
+    const url = URL.createObjectURL(new Blob([toTendsCsv(tends, members, rooms)], { type: 'text/csv' }));
     const a = Object.assign(document.createElement('a'), { href: url, download: `habitat-tending-${dayKey(Date.now())}.csv` });
     a.click();
     URL.revokeObjectURL(url);
@@ -98,7 +98,7 @@ function DataAdmin() {
   return (
     <div className="stack">
       <p className="muted small">
-        CSV columns: Name, Room, Group, <strong>Kind</strong> (Habit or Quest, required), Description, Effort Tier, Energy Type, Frequency (Days: required for habits, blank for quests), Last Done Date, Permanent Owner, Status (Active, Paused, or Done for finished quests). Other columns are ignored.
+        CSV columns: Name, <strong>Room</strong> (required; new names become new rooms), Group, <strong>Kind</strong> (Habit or Quest, required), <strong>Ecological Impact</strong> (Small, Medium or Large, required), Description, Effort Tier, Energy Type, Frequency (Days: required for habits, blank for quests), Last Done Date, Permanent Owner, Status (Active, Paused, or Done for finished quests). Other columns are ignored.
       </p>
       <label className="check">
         <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> Replace existing habits and quests

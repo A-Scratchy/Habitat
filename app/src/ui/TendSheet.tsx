@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { setFrequency, updateTend, type CommonTendFields } from '../data/actions';
 import { DAY, dayKey, parseDay } from '../domain/dates';
-import { KINDS, STATUSES, TIER_ORDER, TIERS, type Tend, type TendStatus } from '../domain/types';
+import { IMPACT_ORDER, IMPACTS, KINDS, STATUSES, TIER_ORDER, TIERS, type Tend, type TendStatus } from '../domain/types';
 import { useHabitat } from './habitat';
 
 type When = 'today' | 'yesterday' | 'twoDays' | 'pick';
@@ -77,6 +77,17 @@ function TweakPanel({ tend }: { tend: Tend }) {
   return (
     <div className="stack">
       <fieldset className="field">
+        <legend>Ecological impact</legend>
+        <div className="chips wrap">
+          {IMPACT_ORDER.map((impact) => (
+            <button key={impact} type="button" className={`chip${tend.impact === impact ? ' on' : ''}`} aria-pressed={tend.impact === impact} title={IMPACTS[impact].hint} onClick={() => save({ impact })}>
+              {IMPACTS[impact].emoji} {IMPACTS[impact].label}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="field">
         <legend>Effort</legend>
         <div className="chips wrap">
           {TIER_ORDER.map((tier) => (
@@ -126,7 +137,7 @@ function TweakPanel({ tend }: { tend: Tend }) {
 }
 
 export function TendSheet({ tend, defaultWho, onClose }: { tend: Tend; defaultWho: string[]; onClose(): void }) {
-  const { tends } = useHabitat();
+  const { tends, roomName } = useHabitat();
   const [view, setView] = useState<'log' | 'tweak'>('log');
   const sheet = useRef<HTMLDivElement>(null);
   // Re-read the tend so quick tweaks show immediately.
@@ -146,7 +157,7 @@ export function TendSheet({ tend, defaultWho, onClose }: { tend: Tend; defaultWh
           <div>
             <h3 id="sheet-title">{live.name}</h3>
             <p className="muted small">
-              {KINDS[live.kind].emoji} {KINDS[live.kind].label} · {live.room}
+              {KINDS[live.kind].emoji} {KINDS[live.kind].label} · {roomName(live.roomId)} · {IMPACTS[live.impact].emoji} {IMPACTS[live.impact].label} impact
             </p>
           </div>
           <button className={`icon-btn${view === 'tweak' ? ' on' : ''}`} onClick={() => setView(view === 'log' ? 'tweak' : 'log')} aria-label={view === 'log' ? `Adjust this ${KINDS[live.kind].label.toLowerCase()}` : 'Back to logging'}>

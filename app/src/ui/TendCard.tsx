@@ -1,7 +1,7 @@
 import { useCallback, useState, type MouseEvent } from 'react';
 import { claimToday, releaseClaim } from '../data/actions';
 import { claimedToday, groupMates, isHandsOff, lastDoneLabel } from '../domain/selection';
-import { ENERGY, KINDS, TIERS, type Tend } from '../domain/types';
+import { ENERGY, IMPACTS, KINDS, TIERS, type Tend } from '../domain/types';
 import { NEEDS, needOf } from '../domain/urgency';
 import { useHabitat } from './habitat';
 import { TendSheet } from './TendSheet';
@@ -9,7 +9,7 @@ import { TendSheet } from './TendSheet';
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 export function TendCard({ tend, big = false }: { tend: Tend; big?: boolean }) {
-  const { tends, ctx, me, memberById, complete } = useHabitat();
+  const { tends, ctx, me, memberById, complete, roomName } = useHabitat();
   const [leaving, setLeaving] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const closeSheet = useCallback(() => setSheetOpen(false), []);
@@ -65,7 +65,12 @@ export function TendCard({ tend, big = false }: { tend: Tend; big?: boolean }) {
         </div>
         <p className="meta">
           {tend.kind === 'quest' && <span className="tag">{KINDS.quest.emoji} Quest</span>}
-          <span>{tend.room}</span>
+          <span>{roomName(tend.roomId)}</span>
+          {tend.impact === 'large' && (
+            <span className="tag" title={IMPACTS.large.hint}>
+              {IMPACTS.large.emoji} Big impact
+            </span>
+          )}
           <span className="tier-badge" title={tier.hint}>
             {tier.emoji} {tier.label}
           </span>

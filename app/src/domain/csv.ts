@@ -1,9 +1,25 @@
 import Papa from 'papaparse';
 import { dayKey, parseDay } from './dates';
-import { DESCRIPTION_MAX, ENERGY_ORDER, type DistributiveOmit, type EffortTier, type EnergyTag, type Member, type Tend, type TendKind, type TendStatus } from './types';
+import {
+  DESCRIPTION_MAX,
+  ENERGY_ORDER,
+  IMPACTS,
+  type DistributiveOmit,
+  type EcologicalImpact,
+  type EffortTier,
+  type EnergyTag,
+  type Member,
+  type Room,
+  type Tend,
+  type TendKind,
+  type TendStatus,
+} from './types';
 
-/** A row ready to import. `completed`: a quest the file marks Done (it goes straight to the Completed shelf). */
-export type ParsedTend = DistributiveOmit<Tend, 'id' | 'ownerId' | 'claim' | 'completedAt'> & { ownerName?: string; completed?: boolean };
+/**
+ * A row ready to import. Rooms are named, not yet linked: the import finds or creates each room by name.
+ * `completed`: a quest the file marks Done (it goes straight to the Completed shelf).
+ */
+export type ParsedTend = DistributiveOmit<Tend, 'id' | 'ownerId' | 'claim' | 'completedAt' | 'roomId'> & { roomName: string; ownerName?: string; completed?: boolean };
 
 /** Any error stops the import: `tends` is then empty and nothing is saved. */
 export interface ParseResult {
@@ -11,7 +27,7 @@ export interface ParseResult {
   errors: string[];
 }
 
-type Field = 'name' | 'room' | 'group' | 'description' | 'kind' | 'tier' | 'energy' | 'frequency' | 'lastDone' | 'owner' | 'status';
+type Field = 'name' | 'room' | 'group' | 'description' | 'kind' | 'impact' | 'tier' | 'energy' | 'frequency' | 'lastDone' | 'owner' | 'status';
 
 const HEADER_ALIASES: Record<string, Field> = {
   chorename: 'name',
@@ -19,6 +35,8 @@ const HEADER_ALIASES: Record<string, Field> = {
   name: 'name',
   tend: 'name',
   kind: 'kind',
+  ecologicalimpact: 'impact',
+  impact: 'impact',
   description: 'description',
   instructions: 'description',
   notes: 'description',
@@ -76,6 +94,11 @@ export function parseEnergy(s: string): EnergyTag[] {
   return ENERGY_ORDER.filter((tag) => v.includes(tag));
 }
 
+export function parseImpact(s: string): EcologicalImpact | undefined {
+  const v = s.trim().toLowerCase();
+  return (Object.keys(IMPACTS) as EcologicalImpact[]).find((k) => k === v);
+}
+
 export function parseKind(s: string): TendKind | undefined {
   const v = s.trim().toLowerCase();
   return v === 'habit' ? 'habit' : v === 'quest' ? 'quest' : undefined;
@@ -109,6 +132,8 @@ export function parseTendsCsv(text: string): ParseResult {
   });
   if (!columns.has('name')) return { tends: [], errors: ['No "Name" column found.'] };
   if (!columns.has('kind')) return { tends: [], errors: ['No "Kind" column found. Add one saying Habit or Quest for every row.'] };
+  if (!columns.has('room')) return { tends: [], errors: ['No "Room" column found.'] };
+  if (!columns.has('impact')) return { tends: [], errors: ['No "Ecological Impact" column found. Add one saying Small, Medium or Large for every row.'] };
 
   const room = canonicaliser();
   const group = canonicaliser();
@@ -126,6 +151,11 @@ export function parseTendsCsv(text: string): ParseResult {
 
     const kind = parseKind(cell('kind'));
     if (!kind) problem(`Kind must be Habit or Quest, not “${cell('kind')}”.`);
+
+    if (!cell('room')) problem('Room is empty; every habit and quest belongs to a room.');
+
+    const impact = parseImpact(cell('impact'));
+    if (!impact) problem(`Ecological Impact must be Small, Medium or Large, not “${cell('impact')}”.`);
 
     const tier = parseTier(cell('tier'));
     if (!tier) problem(`Effort Tier must be Sloth, Tortoise, Worker Bee or Elephant, not “${cell('tier')}”.`);
@@ -151,18 +181,19 @@ export function parseTendsCsv(text: string): ParseResult {
     const description = (columns.has('description') ? (row[columns.get('description')!] ?? '') : '').trim();
     if (description.length > DESCRIPTION_MAX) problem(`the description is longer than ${DESCRIPTION_MAX} characters.`);
 
-    const key = `${cell('room') || 'General'}|${rawName}`.toLowerCase();
-    if (seen.has(key)) problem(`it's listed twice in ${cell('room') || 'General'}.`);
+    const key = `${cell('room')}|${rawName}`.toLowerCase();
+    if (seen.has(key)) problem(`it's listed twice in ${cell('room')}.`);
     seen.add(key);
 
-    if (errors.length > before || !kind || !tier || !status) return;
+    if (errors.length > before || !kind || !tier || !status || !impact) return;
 
     const common = {
       name: name(rawName),
-      room: room(cell('room') || 'General'),
+      roomName: room(cell('room')),
       ...(cell('group') && { group: group(cell('group')) }),
       ...(description && { description }),
       tier,
+      impact,
       energy: parseEnergy(cell('energy')),
       status: status.status,
       ...(lastDone !== undefined && { lastDone }),
@@ -183,15 +214,17 @@ const TIER_EXPORT: Record<EffortTier, string> = {
 
 const KIND_EXPORT: Record<TendKind, string> = { habit: 'Habit', quest: 'Quest' };
 
-export function toTendsCsv(tends: Tend[], members: Member[]): string {
+export function toTendsCsv(tends: Tend[], members: Member[], rooms: Room[]): string {
   const memberName = new Map(members.map((m) => [m.id, m.name]));
+  const roomName = new Map(rooms.map((r) => [r.id, r.name]));
   return Papa.unparse({
-    fields: ['Name', 'Room', 'Group', 'Kind', 'Description', 'Effort Tier', 'Energy Type', 'Frequency (Days)', 'Last Done Date', 'Permanent Owner', 'Status'],
+    fields: ['Name', 'Room', 'Group', 'Kind', 'Ecological Impact', 'Description', 'Effort Tier', 'Energy Type', 'Frequency (Days)', 'Last Done Date', 'Permanent Owner', 'Status'],
     data: tends.map((t) => [
       t.name,
-      t.room,
+      roomName.get(t.roomId) ?? '',
       t.group ?? '',
       KIND_EXPORT[t.kind],
+      IMPACTS[t.impact].label,
       t.description ?? '',
       TIER_EXPORT[t.tier],
       t.energy.join(', '),

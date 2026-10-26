@@ -43,6 +43,7 @@ public static class WinEndpoints
 
         var tend = await db.Tends.FirstOrDefaultAsync(t => t.Id == input.TendId && t.DeletedAt == null);
         if (tend is null) return TypedResults.NotFound();
+        var roomName = await db.Rooms.Where(r => r.Id == tend.RoomId).Select(r => r.Name).FirstAsync();
 
         // Doing an open quest finishes it: it moves to the Completed shelf.
         var finishesQuest = tend.Kind == TendKind.Quest && tend.CompletedAt is null;
@@ -54,7 +55,8 @@ public static class WinEndpoints
             HouseholdId = tend.HouseholdId,
             TendId = tend.Id,
             TendName = tend.Name,
-            Room = tend.Room,
+            RoomId = tend.RoomId,
+            RoomName = roomName,
             At = input.At,
             LoggedAt = now,
             LoggedByDeviceId = principal.DeviceId(),

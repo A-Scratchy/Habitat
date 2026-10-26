@@ -12,19 +12,28 @@ namespace Habitat.Api.Tests;
 [Collection(ApiCollection.Name)]
 public class TendWinSyncTests(ApiFixture api)
 {
-    private static TendInput Bins(int every = 3, Guid? owner = null, DateTimeOffset? seed = null) =>
-        new(TendKind.Habit, "Empty Bin", "Kitchen", "Empty Bins", null, EffortTier.Tortoise, [EnergyTag.Brainless], every, TendStatus.Active, owner, seed);
+    /// <summary>The Kitchen that Setup creates in this test's habitat.</summary>
+    private Guid _kitchen;
 
-    private static TendInput Tip(string? description = null, DateTimeOffset? completedAt = null) =>
-        new(TendKind.Quest, "Go to tip", "General", null, description, EffortTier.Elephant, [], null, TendStatus.Active, null, null, completedAt);
+    private TendInput Bins(int every = 3, Guid? owner = null, DateTimeOffset? seed = null) =>
+        new(TendKind.Habit, "Empty Bin", _kitchen, "Empty Bins", null, EffortTier.Tortoise, EcologicalImpact.Medium, [EnergyTag.Brainless], every, TendStatus.Active, owner, seed);
 
-    /// <summary>A fresh habitat with Robin, a device client and one tend.</summary>
-    private async Task<(string Entra, HttpClient Device, Guid Robin, Guid Tend)> Setup(TendInput? tend = null)
+    private TendInput Tip(string? description = null, DateTimeOffset? completedAt = null) =>
+        new(TendKind.Quest, "Go to tip", _kitchen, null, description, EffortTier.Elephant, EcologicalImpact.Large, [], null, TendStatus.Active, null, null, completedAt);
+
+    private static Task<HttpResponseMessage> PutRoom(HttpClient device, Guid id, string name, int order = 0, string? icon = "🍳") =>
+        device.PutAsJsonAsync($"/api/rooms/{id}", new { name, icon, sortOrder = order });
+
+    /// <summary>A fresh habitat with Robin, a device client, a Kitchen and one tend in it.</summary>
+    /// <param name="tend">Built after the Kitchen exists, since inputs need its id.</param>
+    private async Task<(string Entra, HttpClient Device, Guid Robin, Guid Tend)> Setup(Func<TendInput>? tend = null)
     {
         var (entra, session) = await api.NewHousehold();
         var device = api.Client(session.DeviceToken);
+        _kitchen = Guid.NewGuid();
+        (await PutRoom(device, _kitchen, "Kitchen")).EnsureSuccessStatusCode();
         var tendId = Guid.NewGuid();
-        (await device.PutAsJsonAsync($"/api/tends/{tendId}", tend ?? Bins(), Json.Options)).EnsureSuccessStatusCode();
+        (await device.PutAsJsonAsync($"/api/tends/{tendId}", (tend ?? (() => Bins()))(), Json.Options)).EnsureSuccessStatusCode();
         return (entra, device, session.MemberId, tendId);
     }
 
@@ -47,7 +56,7 @@ public class TendWinSyncTests(ApiFixture api)
         (await device.PutAsJsonAsync($"/api/tends/{questId}", Tip("Take the bags\nAnd the old lamp"), Json.Options)).EnsureSuccessStatusCode();
 
         var h = await Tend(device, habitId);
-        Assert.Equal((TendKind.Habit, "Empty Bin", "Kitchen", "Empty Bins", EffortTier.Tortoise, (int?)3, TendStatus.Active), (h.Kind, h.Name, h.Room, h.Group, h.Tier, h.FrequencyDays, h.Status));
+        Assert.Equal((TendKind.Habit, "Empty Bin", _kitchen, "Empty Bins", EffortTier.Tortoise, EcologicalImpact.Medium, (int?)3, TendStatus.Active), (h.Kind, h.Name, h.RoomId, h.Group, h.Tier, h.Impact, h.FrequencyDays, h.Status));
         Assert.Equal([EnergyTag.Brainless], h.Energy);
 
         var q = await Tend(device, questId);
@@ -55,16 +64,16 @@ public class TendWinSyncTests(ApiFixture api)
     }
 
     [Theory]
-    [InlineData("""{ "name": "X", "room": "Hall", "tier": "Bee", "status": "Active", "frequencyDays": 7 }""", "kind")]
-    [InlineData("""{ "kind": "Habit", "name": "X", "room": "Hall", "status": "Active", "frequencyDays": 7 }""", "tier")]
-    [InlineData("""{ "kind": "Habit", "name": "X", "room": "Hall", "tier": "Bee", "frequencyDays": 7 }""", "status")]
-    [InlineData("""{ "kind": "Habit", "name": "X", "room": "Hall", "tier": "Bee", "status": "Active" }""", "frequencyDays")]
-    [InlineData("""{ "kind": "Quest", "name": "X", "room": "Hall", "tier": "Bee", "status": "Active", "frequencyDays": 7 }""", "frequencyDays")]
-    [InlineData("""{ "kind": "Chore", "name": "X", "room": "Hall", "tier": "Bee", "status": "Active" }""", null)]
+    [InlineData("""{ "name": "X", "roomId": "ROOM", "impact": "Medium", "tier": "Bee", "status": "Active", "frequencyDays": 7 }""", "kind")]
+    [InlineData("""{ "kind": "Habit", "name": "X", "roomId": "ROOM", "impact": "Medium", "status": "Active", "frequencyDays": 7 }""", "tier")]
+    [InlineData("""{ "kind": "Habit", "name": "X", "roomId": "ROOM", "impact": "Medium", "tier": "Bee", "frequencyDays": 7 }""", "status")]
+    [InlineData("""{ "kind": "Habit", "name": "X", "roomId": "ROOM", "impact": "Medium", "tier": "Bee", "status": "Active" }""", "frequencyDays")]
+    [InlineData("""{ "kind": "Quest", "name": "X", "roomId": "ROOM", "impact": "Medium", "tier": "Bee", "status": "Active", "frequencyDays": 7 }""", "frequencyDays")]
+    [InlineData("""{ "kind": "Chore", "name": "X", "roomId": "ROOM", "impact": "Medium", "tier": "Bee", "status": "Active" }""", null)]
     public async Task Nothing_is_assumed_kind_tier_status_and_schedule_must_be_right(string json, string? field)
     {
         var (_, device, _, _) = await Setup();
-        var res = await PutRaw(device, Guid.NewGuid(), json);
+        var res = await PutRaw(device, Guid.NewGuid(), json.Replace("ROOM", _kitchen.ToString()));
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
         if (field is not null) Assert.Contains($"\"{field}\"", await res.Content.ReadAsStringAsync());
     }
@@ -102,7 +111,7 @@ public class TendWinSyncTests(ApiFixture api)
         Assert.Equal(HttpStatusCode.NoContent, res.StatusCode);
 
         var t = await Tend(device, habitId);
-        Assert.Equal((14, (string?)null, EffortTier.Sloth, "Empty Bin", "Kitchen", "Lid in the cupboard"), (t.FrequencyDays, t.Group, t.Tier, t.Name, t.Room, t.Description));
+        Assert.Equal((14, (string?)null, EffortTier.Sloth, "Empty Bin", _kitchen, "Lid in the cupboard"), (t.FrequencyDays, t.Group, t.Tier, t.Name, t.RoomId, t.Description));
     }
 
     [Theory]
@@ -123,14 +132,14 @@ public class TendWinSyncTests(ApiFixture api)
     [Fact]
     public async Task Quests_cannot_be_given_a_schedule_by_patch()
     {
-        var (_, device, _, questId) = await Setup(Tip());
+        var (_, device, _, questId) = await Setup(() => Tip());
         Assert.Equal(HttpStatusCode.BadRequest, (await device.PatchAsJsonAsync($"/api/tends/{questId}", new { frequencyDays = 7 })).StatusCode);
     }
 
     [Fact]
     public async Task Doing_a_quest_finishes_it_undo_reopens_it_and_restart_brings_it_back()
     {
-        var (_, device, robin, questId) = await Setup(Tip());
+        var (_, device, robin, questId) = await Setup(() => Tip());
         var winId = Guid.NewGuid();
 
         (await LogWin(device, questId, [robin], winId: winId)).EnsureSuccessStatusCode();
@@ -184,7 +193,7 @@ public class TendWinSyncTests(ApiFixture api)
     public async Task Undo_puts_last_done_back_to_the_previous_win_or_the_imported_date()
     {
         var seed = api.Clock.GetUtcNow().AddDays(-10);
-        var (_, device, robin, habitId) = await Setup(Bins(seed: seed));
+        var (_, device, robin, habitId) = await Setup(() => Bins(seed: seed));
         Assert.Equal(seed, (await Tend(device, habitId)).LastDoneAt);
 
         var older = Guid.NewGuid();
@@ -266,6 +275,7 @@ public class TendWinSyncTests(ApiFixture api)
         (await device.DeleteAsync($"/api/tends/{habitId}")).EnsureSuccessStatusCode();
 
         var changes = await Sync(device, first.Cursor);
+        Assert.Empty(changes.Rooms);
         Assert.Equal(2, changes.Tends.Length);
         Assert.NotNull(changes.Tends.Single(c => c.Id == habitId).DeletedAt);
         Assert.Equal("Mop floor", changes.Tends.Single(c => c.Id == other).Name);
@@ -278,12 +288,19 @@ public class TendWinSyncTests(ApiFixture api)
     public async Task Sync_never_leaks_another_habitat()
     {
         var (_, mine, _, myTend) = await Setup();
-        var (_, theirs, _, theirTend) = await Setup();
+        var myKitchen = _kitchen;
+        var (_, _, _, theirTend) = await Setup();
+        var theirKitchen = _kitchen;
+        _kitchen = myKitchen;
 
         var sync = await Sync(mine);
         Assert.Contains(sync.Tends, c => c.Id == myTend);
         Assert.DoesNotContain(sync.Tends, c => c.Id == theirTend);
         Assert.Single(sync.Members);
+        Assert.Equal([myKitchen], sync.Rooms.Select(r => r.Id));
+
+        // Nor can a tend be put in their room.
+        Assert.Equal(HttpStatusCode.BadRequest, (await mine.PutAsJsonAsync($"/api/tends/{Guid.NewGuid()}", Bins() with { RoomId = theirKitchen }, Json.Options)).StatusCode);
 
         // Nor can its tends be written by id.
         Assert.Equal(HttpStatusCode.NotFound, (await mine.PatchAsJsonAsync($"/api/tends/{theirTend}", new { frequencyDays = 2 })).StatusCode);
@@ -319,5 +336,67 @@ public class TendWinSyncTests(ApiFixture api)
 
         Assert.Null((await Tend(device, leosHabit)).OwnerMemberId);
         Assert.DoesNotContain((await Sync(device)).Members, m => m.Id == leo);
+    }
+
+    [Fact]
+    public async Task Rooms_can_be_added_renamed_reordered_and_synced()
+    {
+        var (_, device, _, _) = await Setup();
+        var garden = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.NoContent, (await PutRoom(device, garden, "Garden", order: 2, icon: "🌻")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await PutRoom(device, garden, "Back garden", order: 1, icon: null)).StatusCode);
+
+        var room = (await Sync(device)).Rooms.Single(r => r.Id == garden);
+        Assert.Equal(("Back garden", (string?)null, 1), (room.Name, room.Icon, room.SortOrder));
+    }
+
+    [Fact]
+    public async Task Room_names_are_unique_and_required_fields_are_required()
+    {
+        var (_, device, _, _) = await Setup();
+        Assert.Equal(HttpStatusCode.BadRequest, (await PutRoom(device, Guid.NewGuid(), "Kitchen")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await PutRoom(device, Guid.NewGuid(), "")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PutAsJsonAsync($"/api/rooms/{Guid.NewGuid()}", new { name = "Hall" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_room_with_habits_or_quests_cannot_be_removed_until_it_is_empty()
+    {
+        var (_, device, _, habitId) = await Setup();
+        var res = await device.DeleteAsync($"/api/rooms/{_kitchen}");
+        Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
+        Assert.Contains("1 habits and quests", await res.Content.ReadAsStringAsync());
+
+        (await device.DeleteAsync($"/api/tends/{habitId}")).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.NoContent, (await device.DeleteAsync($"/api/rooms/{_kitchen}")).StatusCode);
+        Assert.DoesNotContain((await Sync(device)).Rooms, r => r.Id == _kitchen);
+        // A removed room can't be used any more.
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PutAsJsonAsync($"/api/tends/{Guid.NewGuid()}", Bins(), Json.Options)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Tends_move_between_rooms_and_wins_remember_the_room_name_at_the_time()
+    {
+        var (_, device, robin, habitId) = await Setup();
+        var hall = Guid.NewGuid();
+        (await PutRoom(device, hall, "Hall", 1)).EnsureSuccessStatusCode();
+        (await device.PatchAsJsonAsync($"/api/tends/{habitId}", new { roomId = hall })).EnsureSuccessStatusCode();
+        Assert.Equal(hall, (await Tend(device, habitId)).RoomId);
+
+        var winId = Guid.NewGuid();
+        (await LogWin(device, habitId, [robin], winId: winId)).EnsureSuccessStatusCode();
+        (await PutRoom(device, hall, "Landing", 1)).EnsureSuccessStatusCode();
+        var win = (await Sync(device)).Wins.Single(w => w.Id == winId);
+        Assert.Equal((hall, "Hall"), (win.RoomId, win.RoomName));
+    }
+
+    [Fact]
+    public async Task Impact_is_required_and_patchable()
+    {
+        var (_, device, _, habitId) = await Setup();
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PutAsJsonAsync($"/api/tends/{Guid.NewGuid()}", Bins() with { Impact = null }, Json.Options)).StatusCode);
+        (await device.PatchAsJsonAsync($"/api/tends/{habitId}", new { impact = "Large" })).EnsureSuccessStatusCode();
+        Assert.Equal(EcologicalImpact.Large, (await Tend(device, habitId)).Impact);
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PatchAsJsonAsync($"/api/tends/{habitId}", new { impact = "Huge" })).StatusCode);
     }
 }

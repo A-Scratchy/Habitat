@@ -17,6 +17,7 @@ public class HabitatDb(DbContextOptions<HabitatDb> options, ICurrentHousehold? c
     public DbSet<User> Users => Set<User>();
     public DbSet<Device> Devices => Set<Device>();
     public DbSet<PairingCode> PairingCodes => Set<PairingCode>();
+    public DbSet<Room> Rooms => Set<Room>();
     public DbSet<Tend> Tends => Set<Tend>();
     public DbSet<Win> Wins => Set<Win>();
 
@@ -61,11 +62,20 @@ public class HabitatDb(DbContextOptions<HabitatDb> options, ICurrentHousehold? c
             e.HasIndex(x => x.CodeHash).IsUnique();
         });
 
+        b.Entity<Room>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(40);
+            e.Property(x => x.Icon).HasMaxLength(16);
+            // Room names are unique within a habitat (removed rooms don't count).
+            e.HasIndex(x => new { x.HouseholdId, x.Name }).IsUnique().HasFilter("[DeletedAt] IS NULL");
+        });
+
         b.Entity<Tend>(e =>
         {
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(8);
             e.Property(x => x.Name).HasMaxLength(80);
-            e.Property(x => x.Room).HasMaxLength(40);
+            e.HasOne<Room>().WithMany().HasForeignKey(x => x.RoomId).OnDelete(DeleteBehavior.NoAction);
+            e.Property(x => x.Impact).HasConversion<string>().HasMaxLength(8);
             e.Property(x => x.Group).HasMaxLength(40);
             e.Property(x => x.Description).HasMaxLength(TendRules.DescriptionMax);
             e.Property(x => x.Tier).HasConversion<string>().HasMaxLength(16);
@@ -81,7 +91,7 @@ public class HabitatDb(DbContextOptions<HabitatDb> options, ICurrentHousehold? c
         b.Entity<Win>(e =>
         {
             e.Property(x => x.TendName).HasMaxLength(80);
-            e.Property(x => x.Room).HasMaxLength(40);
+            e.Property(x => x.RoomName).HasMaxLength(40);
             e.HasIndex(x => new { x.TendId, x.At });
             e.OwnsMany(x => x.Members, m =>
             {

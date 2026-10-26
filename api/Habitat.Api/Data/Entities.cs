@@ -84,6 +84,27 @@ public class PairingCode : HouseholdEntity
     public Guid? DeviceId { get; set; }
 }
 
+/// <summary>A part of the home: kitchen, garden, Leo's room. Every habit and quest belongs to one.</summary>
+public class Room : HouseholdEntity, ISynced
+{
+    public required string Name { get; set; }
+    /// <summary>An emoji, or null for none (the app shows a plain house).</summary>
+    public string? Icon { get; set; }
+    /// <summary>Position in lists; lower comes first.</summary>
+    public int SortOrder { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
+    public long RowVersion { get; set; }
+}
+
+/// <summary>How much leaving it undone hurts its room. Weights room health 1 / 2 / 4.</summary>
+public enum EcologicalImpact
+{
+    Small,
+    Medium,
+    Large,
+}
+
 public enum EffortTier
 {
     Sloth,
@@ -122,11 +143,12 @@ public class Tend : HouseholdEntity, ISynced
 {
     public TendKind Kind { get; set; }
     public required string Name { get; set; }
-    public required string Room { get; set; }
+    public Guid RoomId { get; set; }
     public string? Group { get; set; }
     /// <summary>Notes or step-by-step instructions, one step per line.</summary>
     public string? Description { get; set; }
     public EffortTier Tier { get; set; }
+    public EcologicalImpact Impact { get; set; }
     public List<EnergyTag> Energy { get; set; } = [];
     /// <summary>Habits only (required for them).</summary>
     public int? FrequencyDays { get; set; }
@@ -150,9 +172,10 @@ public class Tend : HouseholdEntity, ISynced
 public class Win : HouseholdEntity, ISynced
 {
     public Guid TendId { get; set; }
-    /// <summary>Snapshot, so the feed still reads right if it's renamed or removed.</summary>
+    /// <summary>Snapshots, so the feed still reads right if the tend or room is renamed or removed.</summary>
     public required string TendName { get; set; }
-    public required string Room { get; set; }
+    public Guid RoomId { get; set; }
+    public required string RoomName { get; set; }
     /// <summary>When it was done; may be backdated.</summary>
     public DateTimeOffset At { get; set; }
     /// <summary>When it was recorded.</summary>

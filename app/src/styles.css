@@ -922,3 +922,88 @@ select {
     transition: none !important;
   }
 }
+
+/* Habitat overview */
+
+:root {
+  --health-flourishing: #7fae86;
+  --health-healthy: #a9c99e;
+  --health-thirsty: #8fb1cc;
+  --health-wilting: #d9b47a;
+}
+
+.health-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+  width: 100%;
+}
+
+.health-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.4s ease;
+}
+
+.health-bar.flourishing span { background: var(--health-flourishing); }
+.health-bar.healthy span { background: var(--health-healthy); }
+.health-bar.thirsty span { background: var(--health-thirsty); }
+.health-bar.wilting span { background: var(--health-wilting); }
+
+.screen-head .health-bar {
+  margin-top: 6px;
+}
+
+.pack-totals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.pack-totals .total {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 8px;
+}
+
+.pack-totals strong {
+  font-size: 1.5rem;
+}
+
+.center-text {
+  text-align: center;
+}
+
+.room-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.room-health {
+  font-size: 1.1rem;
+}
+
+.room-tile .health-bar {
+  margin: 2px 0;
+}
+
+.room-admin-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.room-admin-row .admin-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.room-admin-row .icon-btn:disabled {
+  opacity: 0.35;
+}

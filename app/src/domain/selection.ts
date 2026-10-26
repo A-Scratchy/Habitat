@@ -72,16 +72,17 @@ export function pickRandom<T extends { id: string }>(pool: T[], excludeId?: stri
 }
 
 export interface BrowseFilter {
-  room?: string;
+  roomId?: string;
   query?: string;
   tiers?: EffortTier[];
   energy?: EnergyTag[];
 }
 
-export function matchesQuery(t: Tend, query: string): boolean {
+/** Searches the name, group, description and (if given) the room's name. */
+export function matchesQuery(t: Tend, query: string, roomName = ''): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return [t.name, t.room, t.group ?? '', t.description ?? ''].some((s) => s.toLowerCase().includes(q));
+  return [t.name, roomName, t.group ?? '', t.description ?? ''].some((s) => s.toLowerCase().includes(q));
 }
 
 /**
@@ -89,14 +90,14 @@ export function matchesQuery(t: Tend, query: string): boolean {
  * recently done, since some habits need doing again sooner than their schedule says. Paused tends
  * and finished quests never show here (they live in the Tending tab and the Completed shelf).
  */
-export function browse(tends: Tend[], ctx: ViewContext, kind: TendKind, f: BrowseFilter): Tend[] {
+export function browse(tends: Tend[], ctx: ViewContext, kind: TendKind, f: BrowseFilter, roomName: (id: string) => string = () => ''): Tend[] {
   const rank = (t: Tend) => needRatio(t, ctx.now) ?? -1;
-  const inScope = (t: Tend) => isOpen(t) && t.kind === kind && (!f.room || t.room === f.room);
+  const inScope = (t: Tend) => isOpen(t) && t.kind === kind && (!f.roomId || t.roomId === f.roomId);
   return tends
     .filter(
       (t) =>
         inScope(t) &&
-        matchesQuery(t, f.query ?? '') &&
+        matchesQuery(t, f.query ?? '', roomName(t.roomId)) &&
         (!f.tiers?.length || f.tiers.includes(t.tier)) &&
         (!f.energy?.length || f.energy.every((e) => t.energy.includes(e))),
     )

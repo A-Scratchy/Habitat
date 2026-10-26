@@ -13,11 +13,11 @@ import { QuickChoice } from './ui/QuickChoice';
 import { QuickWins } from './ui/QuickWins';
 import { Settings, type SettingsTab } from './ui/Settings';
 import { SignIn } from './ui/SignIn';
-import { WateringHole } from './ui/WateringHole';
+import { Overview } from './ui/Overview';
 import { Welcome } from './ui/Welcome';
 
 const TABS = [
-  { id: 'wins', icon: '🌊', label: 'Wins' },
+  { id: 'habitat', icon: '🏡', label: 'Habitat' },
   { id: 'quick', icon: '🍃', label: 'Quick' },
   { id: 'sloth', icon: '🦥', label: 'Sloth' },
   { id: 'forage', icon: '🍄', label: 'Forage' },
@@ -32,9 +32,12 @@ function Main() {
   const [profileOpen, setProfileOpen] = useState(false);
   const closeProfile = useCallback(() => setProfileOpen(false), []);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>();
-  // Always opens on the Watering Hole: the family sees what's been done before anything else.
-  const [tab, setTabState] = useState<TabId>('wins');
+  // Always opens on the Habitat overview: how the home is doing and what the pack has done.
+  const [tab, setTabState] = useState<TabId>('habitat');
+  /** Set when a room tile on the overview opens that room in Forage. */
+  const [forageRoomId, setForageRoomId] = useState<string>();
   const setTab = (t: TabId) => {
+    if (t !== 'forage') setForageRoomId(undefined);
     setTabState(t);
     window.scrollTo({ top: 0 });
   };
@@ -63,10 +66,17 @@ function Main() {
       </header>
 
       <main>
-        {tab === 'wins' && <WateringHole />}
+        {tab === 'habitat' && (
+          <Overview
+            onOpenRoom={(room) => {
+              setForageRoomId(room.id);
+              setTab('forage');
+            }}
+          />
+        )}
         {tab === 'quick' && <QuickChoice />}
         {tab === 'sloth' && <QuickWins />}
-        {tab === 'forage' && <Browse key="habit" kind="habit" />}
+        {tab === 'forage' && <Browse key={`habit-${forageRoomId ?? ''}`} kind="habit" initialRoomId={forageRoomId} />}
         {tab === 'quests' && <Browse key="quest" kind="quest" />}
         {tab === 'tending' && <Tending />}
         {tab === 'settings' && <Settings key={settingsTab} initialTab={settingsTab} />}

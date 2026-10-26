@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Habitat.Api.Data.Migrations
 {
     [DbContext(typeof(HabitatDb))]
-    [Migration("20261026212657_Initial")]
+    [Migration("20261026220602_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -176,6 +176,52 @@ namespace Habitat.Api.Data.Migrations
                     b.ToTable("PairingCodes");
                 });
 
+            modelBuilder.Entity("Habitat.Api.Data.Room", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("HouseholdId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HouseholdId");
+
+                    b.HasIndex("RowVersion");
+
+                    b.HasIndex("HouseholdId", "Name")
+                        .IsUnique()
+                        .HasFilter("[DeletedAt] IS NULL");
+
+                    b.ToTable("Rooms");
+                });
+
             modelBuilder.Entity("Habitat.Api.Data.Tend", b =>
                 {
                     b.Property<Guid>("Id")
@@ -212,6 +258,11 @@ namespace Habitat.Api.Data.Migrations
                     b.Property<Guid>("HouseholdId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Impact")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(8)
@@ -228,10 +279,8 @@ namespace Habitat.Api.Data.Migrations
                     b.Property<Guid?>("OwnerMemberId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("Room")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
+                    b.Property<Guid>("RoomId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -258,6 +307,8 @@ namespace Habitat.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("HouseholdId");
+
+                    b.HasIndex("RoomId");
 
                     b.HasIndex("RowVersion");
 
@@ -335,7 +386,10 @@ namespace Habitat.Api.Data.Migrations
                     b.Property<Guid>("LoggedByDeviceId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("Room")
+                    b.Property<Guid>("RoomId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RoomName")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("nvarchar(40)");
@@ -395,12 +449,27 @@ namespace Habitat.Api.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Habitat.Api.Data.Room", b =>
+                {
+                    b.HasOne("Habitat.Api.Data.Household", null)
+                        .WithMany()
+                        .HasForeignKey("HouseholdId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Habitat.Api.Data.Tend", b =>
                 {
                     b.HasOne("Habitat.Api.Data.Household", null)
                         .WithMany()
                         .HasForeignKey("HouseholdId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Habitat.Api.Data.Room", null)
+                        .WithMany()
+                        .HasForeignKey("RoomId")
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
                 });
 

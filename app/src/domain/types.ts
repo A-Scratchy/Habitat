@@ -8,6 +8,19 @@ export type TendStatus = 'active' | 'paused';
 
 export type EnergyTag = 'micro' | 'brainless' | 'transition' | 'sensory';
 
+/** How much leaving it undone hurts its room. Drives room health (weights 1 / 2 / 4). */
+export type EcologicalImpact = 'small' | 'medium' | 'large';
+
+/** A part of the home. Every habit and quest belongs to exactly one. */
+export interface Room {
+  id: string;
+  name: string;
+  /** An emoji, or missing for none (shown as a plain house). */
+  icon?: string;
+  /** Position in lists; lower comes first. */
+  sortOrder: number;
+}
+
 /** "I'll do this today": valid only while `day` is today (local YYYY-MM-DD). */
 export interface Claim {
   memberId: string;
@@ -21,11 +34,12 @@ export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omi
 interface TendBase {
   id: string;
   name: string;
-  room: string;
+  roomId: string;
   group?: string;
   /** Notes or step-by-step instructions; one step per line. */
   description?: string;
   tier: EffortTier;
+  impact: EcologicalImpact;
   energy: EnergyTag[];
   status: TendStatus;
   /** Epoch ms. Missing means "not yet known", which is never treated as overdue. */
@@ -64,6 +78,8 @@ export interface Win {
   id: string;
   tendId: string;
   tendName: string;
+  roomId: string;
+  /** The room's name when it was done, so the feed still reads right after a rename. */
   room: string;
   memberId: string;
   /** Others tagged as having helped. */
@@ -85,6 +101,18 @@ export const KINDS: Record<TendKind, { emoji: string; label: string; plural: str
   habit: { emoji: '🔁', label: 'Habit', plural: 'Habits', hint: 'Comes back on a schedule' },
   quest: { emoji: '🗺️', label: 'Quest', plural: 'Quests', hint: 'A one-off; it goes to Completed when done' },
 };
+
+export const IMPACT_ORDER: EcologicalImpact[] = ['small', 'medium', 'large'];
+
+export const IMPACTS: Record<EcologicalImpact, { emoji: string; label: string; weight: number; hint: string }> = {
+  small: { emoji: '🌱', label: 'Small', weight: 1, hint: 'The room barely notices if it waits' },
+  medium: { emoji: '🌿', label: 'Medium', weight: 2, hint: 'Leaving it starts to show' },
+  large: { emoji: '🌳', label: 'Large', weight: 4, hint: 'The room really suffers without it' },
+};
+
+export const roomIcon = (r: Room | undefined) => r?.icon || '🏠';
+
+export const byRoomOrder = (a: Room, b: Room) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name);
 
 export const TIER_ORDER: EffortTier[] = ['sloth', 'tortoise', 'bee', 'elephant'];
 

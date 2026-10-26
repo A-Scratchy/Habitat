@@ -1,5 +1,5 @@
 import { dayKey, DAY, timeOfDay } from '../domain/dates';
-import { weekSummary, winMembers } from '../domain/selection';
+import { winMembers } from '../domain/selection';
 import type { Win } from '../domain/types';
 import { useHabitat } from './habitat';
 
@@ -25,40 +25,15 @@ function WinRow({ win }: { win: Win }) {
   );
 }
 
-export function WateringHole() {
+/** The Watering Hole: today's wins (and yesterday's, folded), newest first. */
+export function WinsFeed() {
   const { wins, ctx } = useHabitat();
   const sorted = [...wins].sort((a, b) => b.at - a.at);
   const today = sorted.filter((w) => dayKey(w.at) === dayKey(ctx.now));
   const yesterday = sorted.filter((w) => dayKey(w.at) === dayKey(ctx.now - DAY));
-  const week = weekSummary(wins, ctx.now);
 
   return (
-    <section className="screen">
-      <header className="screen-head">
-        <h2>The Watering Hole</h2>
-        <p className="muted">Look how our pack looked after the habitat.</p>
-      </header>
-
-      <div className="panel week">
-        {week.total === 0 ? (
-          <p>A fresh week is starting. The habitat is resting 🌙</p>
-        ) : (
-          <>
-            <p className="week-total">
-              This week we’ve cared for the habitat <strong>{week.total}</strong> {week.total === 1 ? 'time' : 'times'} 🌿
-            </p>
-            <p className="muted small">
-              {week.helpers > 1 ? `${week.helpers} of us helped · ` : ''}
-              {week.rooms
-                .slice(0, 4)
-                .map(([room, n]) => `${room} ${n}`)
-                .join(' · ')}
-            </p>
-          </>
-        )}
-      </div>
-
-      <h3 className="section-title">Today</h3>
+    <>
       {today.length === 0 ? (
         <p className="empty">Nothing logged yet today. That’s fine: there’s no hurry 🐌</p>
       ) : (
@@ -79,6 +54,6 @@ export function WateringHole() {
           </ul>
         </details>
       )}
-    </section>
+    </>
   );
 }
