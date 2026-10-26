@@ -81,11 +81,18 @@ public class HabitatDb(DbContextOptions<HabitatDb> options, ICurrentHousehold? c
             e.Property(x => x.Tier).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
             e.PrimitiveCollection(x => x.Energy).ElementType().HasConversion<string>();
+            e.OwnsMany(x => x.AvailableTo, m =>
+            {
+                m.ToTable("QuestMembers");
+                m.WithOwner().HasForeignKey("TendId");
+                m.HasKey("TendId", nameof(QuestMember.MemberId));
+                m.HasIndex(x => x.MemberId);
+            });
             // The habit/quest rules live in the database too, so no code path can store a half-and-half tend.
             // "IS NOT NULL" is spelled out: SQL treats a CHECK that evaluates to unknown (NULL BETWEEN ...) as passing.
             e.ToTable(t => t.HasCheckConstraint(
                 "CK_Tends_KindFields",
-                "([Kind] = 'Habit' AND [FrequencyDays] IS NOT NULL AND [FrequencyDays] BETWEEN 1 AND 3650 AND [CompletedAt] IS NULL) OR ([Kind] = 'Quest' AND [FrequencyDays] IS NULL)"));
+                "([Kind] = 'Habit' AND [RoomId] IS NOT NULL AND [FrequencyDays] IS NOT NULL AND [FrequencyDays] BETWEEN 1 AND 3650 AND [CompletedAt] IS NULL AND [OpenToEveryone] IS NULL) OR ([Kind] = 'Quest' AND [FrequencyDays] IS NULL AND [OpenToEveryone] IS NOT NULL AND [OwnerMemberId] IS NULL)"));
         });
 
         b.Entity<Win>(e =>

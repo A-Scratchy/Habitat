@@ -17,8 +17,8 @@ export async function completeTends(tendIds: string[], memberIds: string[], at =
     for (const tend of await db.tends.bulkGet(tendIds)) {
       if (!tend) continue;
       const finishesQuest = tend.kind === 'quest' && tend.completedAt == null;
-      const room = (await db.rooms.get(tend.roomId))?.name ?? '';
-      const win: Win = { id: newId(), tendId: tend.id, tendName: tend.name, roomId: tend.roomId, room, memberId, at, prevLastDone: tend.lastDone };
+      const room = tend.roomId ? (await db.rooms.get(tend.roomId))?.name : undefined;
+      const win: Win = { id: newId(), tendId: tend.id, tendName: tend.name, ...(tend.roomId && { roomId: tend.roomId, room }), memberId, at, prevLastDone: tend.lastDone };
       if (helperIds.length) win.helperIds = helperIds;
       if (finishesQuest) win.completedQuest = true;
       await db.wins.add(win);
@@ -50,8 +50,8 @@ export async function claimToday(tendId: string, memberId: string): Promise<void
   await db.tends.update(tendId, { claim: { memberId, day: dayKey(Date.now()) } });
 }
 
-/** Fields every tend has. Kind-specific changes go through saveTend, setFrequency or restartQuest. */
-export type CommonTendFields = Pick<Tend, 'name' | 'roomId' | 'group' | 'description' | 'tier' | 'impact' | 'energy' | 'status' | 'ownerId'>;
+/** Fields every tend has. Kind-specific changes (room, schedule, finishing) go through saveTend, setFrequency or restartQuest. */
+export type CommonTendFields = Pick<Tend, 'name' | 'group' | 'description' | 'tier' | 'impact' | 'energy' | 'status'>;
 
 export async function updateTend(id: string, patch: Partial<CommonTendFields>): Promise<void> {
   await db.tends.update(id, patch);
@@ -130,6 +130,12 @@ export async function deleteMember(id: string): Promise<void> {
   await db.transaction('rw', db.members, db.tends, async () => {
     await db.members.delete(id);
     await db.tends.filter((t) => t.ownerId === id).modify((t) => void delete t.ownerId);
+    // A quest only they could do is left with nobody; Tending flags it so it can be reassigned.
+    await db.tends
+      .filter((t) => t.kind === 'quest' && Array.isArray(t.availableTo) && t.availableTo.includes(id))
+      .modify((t) => {
+        if (t.kind === 'quest' && Array.isArray(t.availableTo)) t.availableTo = t.availableTo.filter((m) => m !== id);
+      });
   });
 }
 
@@ -147,9 +153,11 @@ export async function importTends(parsed: ParsedTend[], opts: ImportOptions): Pr
     }
     const members = await db.members.toArray();
     const byName = new Map(members.map((m) => [m.name.toLowerCase(), m]));
-    for (const p of parsed) {
-      if (!p.ownerName || byName.has(p.ownerName.toLowerCase())) continue;
-      const m: Member = { id: newId(), name: p.ownerName, animal: ANIMALS[members.length % ANIMALS.length] };
+    // Members named as owners or in Available To are matched by name, or created.
+    const named = parsed.flatMap((p) => [p.ownerName, ...(Array.isArray(p.availableToNames) ? p.availableToNames : [])]);
+    for (const name of named) {
+      if (!name || byName.has(name.toLowerCase())) continue;
+      const m: Member = { id: newId(), name, animal: ANIMALS[members.length % ANIMALS.length] };
       members.push(m);
       byName.set(m.name.toLowerCase(), m);
       await db.members.add(m);
@@ -160,7 +168,7 @@ export async function importTends(parsed: ParsedTend[], opts: ImportOptions): Pr
     const roomByName = new Map(rooms.map((r) => [r.name.toLowerCase(), r]));
     let nextOrder = Math.max(-1, ...rooms.map((r) => r.sortOrder)) + 1;
     for (const p of parsed) {
-      if (roomByName.has(p.roomName.toLowerCase())) continue;
+      if (!p.roomName || roomByName.has(p.roomName.toLowerCase())) continue;
       const room: Room = { id: newId(), name: p.roomName, sortOrder: nextOrder++ };
       rooms.push(room);
       roomByName.set(room.name.toLowerCase(), room);
@@ -168,12 +176,16 @@ export async function importTends(parsed: ParsedTend[], opts: ImportOptions): Pr
     }
 
     const now = Date.now();
-    let tends: Tend[] = parsed.map(({ ownerName, completed, roomName, ...rest }) => {
-      const ownerId = ownerName ? byName.get(ownerName.toLowerCase())?.id : undefined;
-      const roomId = roomByName.get(roomName.toLowerCase())!.id;
-      return rest.kind === 'quest'
-        ? { ...rest, id: newId(), roomId, ownerId, ...(completed && { completedAt: rest.lastDone ?? now }) }
-        : { ...rest, id: newId(), roomId, ownerId };
+    const memberId = (name: string) => byName.get(name.toLowerCase())!.id;
+    let tends: Tend[] = parsed.map(({ ownerName, availableToNames, completed, roomName, ...rest }) => {
+      const roomId = roomName ? roomByName.get(roomName.toLowerCase())!.id : undefined;
+      if (rest.kind === 'quest') {
+        if (!availableToNames) throw new Error(`“${rest.name}” is a quest that doesn’t say who can take it on.`);
+        const availableTo = availableToNames === 'everyone' ? 'everyone' : availableToNames.map(memberId);
+        return { ...rest, id: newId(), ...(roomId && { roomId }), availableTo, ...(completed && { completedAt: rest.lastDone ?? now }) };
+      }
+      if (!roomId) throw new Error(`“${rest.name}” is a habit with no room.`);
+      return { ...rest, id: newId(), roomId, ...(ownerName && { ownerId: memberId(ownerName) }) };
     });
     if (opts.mockDates) {
       const mocked = mockHistory(tends, rooms, members, Date.now(), newId);

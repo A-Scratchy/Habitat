@@ -19,7 +19,7 @@ public class TendWinSyncTests(ApiFixture api)
         new(TendKind.Habit, "Empty Bin", _kitchen, "Empty Bins", null, EffortTier.Tortoise, EcologicalImpact.Medium, [EnergyTag.Brainless], every, TendStatus.Active, owner, seed);
 
     private TendInput Tip(string? description = null, DateTimeOffset? completedAt = null) =>
-        new(TendKind.Quest, "Go to tip", _kitchen, null, description, EffortTier.Elephant, EcologicalImpact.Large, [], null, TendStatus.Active, null, null, completedAt);
+        new(TendKind.Quest, "Go to tip", _kitchen, null, description, EffortTier.Elephant, EcologicalImpact.Large, [], null, TendStatus.Active, null, null, completedAt, OpenToEveryone: true);
 
     private static Task<HttpResponseMessage> PutRoom(HttpClient device, Guid id, string name, int order = 0, string? icon = "🍳") =>
         device.PutAsJsonAsync($"/api/rooms/{id}", new { name, icon, sortOrder = order });
@@ -97,7 +97,7 @@ public class TendWinSyncTests(ApiFixture api)
         var (_, device, _, habitId) = await Setup();
         Assert.Equal(HttpStatusCode.BadRequest, (await device.PatchAsJsonAsync($"/api/tends/{habitId}", new { kind = "Quest" })).StatusCode);
 
-        (await device.PutAsJsonAsync($"/api/tends/{habitId}", Bins() with { Kind = TendKind.Quest, FrequencyDays = null }, Json.Options)).EnsureSuccessStatusCode();
+        (await device.PutAsJsonAsync($"/api/tends/{habitId}", Bins() with { Kind = TendKind.Quest, FrequencyDays = null, OpenToEveryone = true }, Json.Options)).EnsureSuccessStatusCode();
         var t = await Tend(device, habitId);
         Assert.Equal((TendKind.Quest, (int?)null), (t.Kind, t.FrequencyDays));
     }
@@ -388,6 +388,113 @@ public class TendWinSyncTests(ApiFixture api)
         (await PutRoom(device, hall, "Landing", 1)).EnsureSuccessStatusCode();
         var win = (await Sync(device)).Wins.Single(w => w.Id == winId);
         Assert.Equal((hall, "Hall"), (win.RoomId, win.RoomName));
+    }
+
+    [Fact]
+    public async Task Quests_may_have_no_room_but_habits_always_do()
+    {
+        var (_, device, robin, _) = await Setup();
+
+        var tip = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.NoContent, (await device.PutAsJsonAsync($"/api/tends/{tip}", Tip() with { RoomId = null }, Json.Options)).StatusCode);
+        Assert.Null((await Tend(device, tip)).RoomId);
+
+        var homeless = await device.PutAsJsonAsync($"/api/tends/{Guid.NewGuid()}", Bins() with { RoomId = null }, Json.Options);
+        Assert.Equal(HttpStatusCode.BadRequest, homeless.StatusCode);
+        Assert.Contains("\"roomId\"", await homeless.Content.ReadAsStringAsync());
+
+        // A win on a room-less quest records no room.
+        var winId = Guid.NewGuid();
+        (await LogWin(device, tip, [robin], winId: winId)).EnsureSuccessStatusCode();
+        var win = (await Sync(device)).Wins.Single(w => w.Id == winId);
+        Assert.Equal(((Guid?)null, (string?)null), (win.RoomId, win.RoomName));
+    }
+
+    [Fact]
+    public async Task A_quest_can_leave_its_room_but_a_habit_cannot()
+    {
+        var (_, device, _, habitId) = await Setup();
+        var questId = Guid.NewGuid();
+        (await device.PutAsJsonAsync($"/api/tends/{questId}", Tip(), Json.Options)).EnsureSuccessStatusCode();
+
+        Assert.Equal(HttpStatusCode.NoContent, (await device.PatchAsJsonAsync($"/api/tends/{questId}", new { roomId = (Guid?)null })).StatusCode);
+        Assert.Null((await Tend(device, questId)).RoomId);
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PatchAsJsonAsync($"/api/tends/{habitId}", new { roomId = (Guid?)null })).StatusCode);
+
+        // And the database refuses a room-less habit even if the API were bypassed.
+        using var scope = api.Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HabitatDb>();
+        await Assert.ThrowsAnyAsync<Exception>(() =>
+            db.Tends.IgnoreQueryFilters().Where(t => t.Id == habitId).ExecuteUpdateAsync(s => s.SetProperty(t => t.RoomId, (Guid?)null)));
+    }
+
+    [Fact]
+    public async Task Quests_say_who_can_take_them_on()
+    {
+        var (_, device, robin, _) = await Setup();
+        var leo = Guid.NewGuid();
+        (await device.PutAsJsonAsync($"/api/members/{leo}", new { name = "Leo", animal = "🐻" })).EnsureSuccessStatusCode();
+
+        var forLeo = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.NoContent, (await device.PutAsJsonAsync($"/api/tends/{forLeo}", Tip() with { OpenToEveryone = false, AvailableTo = [leo] }, Json.Options)).StatusCode);
+        var q = await Tend(device, forLeo);
+        Assert.False(q.OpenToEveryone);
+        Assert.Equal([leo], q.AvailableTo);
+
+        // Widen it to everyone, then back to two people.
+        (await device.PatchAsJsonAsync($"/api/tends/{forLeo}", new { openToEveryone = true, availableTo = Array.Empty<Guid>() })).EnsureSuccessStatusCode();
+        Assert.True((await Tend(device, forLeo)).OpenToEveryone);
+        (await device.PatchAsJsonAsync($"/api/tends/{forLeo}", new { openToEveryone = false, availableTo = new[] { leo, robin } })).EnsureSuccessStatusCode();
+        Assert.Equal(2, (await Tend(device, forLeo)).AvailableTo.Length);
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("open-with-members")]
+    [InlineData("restricted-to-nobody")]
+    [InlineData("stranger")]
+    [InlineData("quest-owner")]
+    [InlineData("habit-with-availability")]
+    public async Task Quest_availability_is_never_guessed_or_contradictory(string which)
+    {
+        var (_, device, robin, _) = await Setup();
+        var input = which switch
+        {
+            "missing" => Tip() with { OpenToEveryone = null },
+            "open-with-members" => Tip() with { AvailableTo = [robin] },
+            "restricted-to-nobody" => Tip() with { OpenToEveryone = false },
+            "stranger" => Tip() with { OpenToEveryone = false, AvailableTo = [Guid.NewGuid()] },
+            "quest-owner" => Tip() with { OwnerMemberId = robin },
+            _ => Bins() with { OpenToEveryone = true },
+        };
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PutAsJsonAsync($"/api/tends/{Guid.NewGuid()}", input, Json.Options)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Removing_a_member_takes_them_off_quests()
+    {
+        var (entra, device, robin, _) = await Setup();
+        var leo = Guid.NewGuid();
+        (await device.PutAsJsonAsync($"/api/members/{leo}", new { name = "Leo", animal = "🐻" })).EnsureSuccessStatusCode();
+        var questId = Guid.NewGuid();
+        (await device.PutAsJsonAsync($"/api/tends/{questId}", Tip() with { OpenToEveryone = false, AvailableTo = [leo, robin] }, Json.Options)).EnsureSuccessStatusCode();
+
+        (await api.Client(entra).DeleteAsync($"/api/members/{leo}")).EnsureSuccessStatusCode();
+        Assert.Equal([robin], (await Tend(device, questId)).AvailableTo);
+    }
+
+    [Fact]
+    public async Task The_database_requires_quests_to_say_who_and_never_to_have_an_owner()
+    {
+        var (_, device, robin, _) = await Setup();
+        var questId = Guid.NewGuid();
+        (await device.PutAsJsonAsync($"/api/tends/{questId}", Tip(), Json.Options)).EnsureSuccessStatusCode();
+
+        using var scope = api.Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HabitatDb>();
+        var raw = db.Tends.IgnoreQueryFilters().Where(t => t.Id == questId);
+        await Assert.ThrowsAnyAsync<Exception>(() => raw.ExecuteUpdateAsync(s => s.SetProperty(t => t.OpenToEveryone, (bool?)null)));
+        await Assert.ThrowsAnyAsync<Exception>(() => raw.ExecuteUpdateAsync(s => s.SetProperty(t => t.OwnerMemberId, (Guid?)robin)));
     }
 
     [Fact]

@@ -11,8 +11,8 @@ export interface Habitat {
   /** In display order. */
   rooms: Room[];
   roomById: Map<string, Room>;
-  /** A room's name, or '' for an unknown id. Handy for search and labels. */
-  roomName(id: string): string;
+  /** A room's name; '' for none or an unknown id. Handy for search and labels. */
+  roomName(id?: string): string;
   tends: Tend[];
   members: Member[];
   /** Wins since the start of this week (and at least since yesterday). */
@@ -84,19 +84,18 @@ export function HabitatProvider({ children, loading }: { children: (state: 'load
       const memberIds = opts.memberIds ?? (meId ? [meId] : []);
       if (!memberIds.length) return;
       const winIds = await completeTends(tendIds, memberIds, opts.at);
-      const others = memberIds.filter((id) => id !== meId).map((id) => members?.find((m) => m.id === id)?.name);
       const quest = tendIds.length === 1 && tends?.find((x) => x.id === tendIds[0])?.kind === 'quest';
       const message =
         quest
           ? 'Quest complete! 🏆 It’s on the Completed shelf.'
           : winIds.length > 1
           ? `${winIds.length} done in one sweep! 🚀`
-          : others.length
-            ? `Logged, thank you ${others.join(' & ')} ✨`
+          : memberIds.length > 1
+            ? 'Logged: done together ✨'
             : CHEERS[Math.floor(Math.random() * CHEERS.length)];
       showToast({ message, winIds });
     },
-    [meId, members, tends, showToast],
+    [meId, tends, showToast],
   );
 
   const value = useMemo<Habitat | null>(() => {
@@ -107,7 +106,7 @@ export function HabitatProvider({ children, loading }: { children: (state: 'load
     return {
       rooms: [...rooms].sort(byRoomOrder),
       roomById,
-      roomName: (id: string) => roomById.get(id)?.name ?? '',
+      roomName: (id?: string) => (id ? (roomById.get(id)?.name ?? '') : ''),
       tends,
       members,
       wins,

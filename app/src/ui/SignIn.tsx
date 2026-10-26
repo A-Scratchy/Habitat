@@ -11,6 +11,7 @@ import {
   signInDevice,
   type Connection,
 } from '../data/api';
+import { startDemo } from '../data/example';
 import { ANIMALS } from '../domain/types';
 import { BusyScreen, SignInStatus } from './Busy';
 import { AnimalPicker } from './Members';
@@ -35,6 +36,17 @@ export function SignIn({ pending, onConnected }: { pending?: Connection; onConne
   );
   const [error, setError] = useState<string>();
   const account = signedInAccount();
+
+  const [demoLoading, setDemoLoading] = useState(false);
+  const openDemo = async () => {
+    setDemoLoading(true);
+    try {
+      await startDemo();
+    } catch (e) {
+      fail(e);
+      setDemoLoading(false);
+    }
+  };
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
 
@@ -139,6 +151,9 @@ export function SignIn({ pending, onConnected }: { pending?: Connection; onConne
             Join with a code 🔑
           </button>
           <p className="muted small">For kids’ devices and shared tablets. Someone in your habitat gives you the code.</p>
+          <button className="link center" disabled={demoLoading} onClick={() => void openDemo()}>
+            {demoLoading ? 'Planting the demo…' : '👀 Just looking? Explore a demo habitat'}
+          </button>
         </div>
       )}
 

@@ -273,10 +273,13 @@ namespace Habitat.Api.Data.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
 
+                    b.Property<bool?>("OpenToEveryone")
+                        .HasColumnType("bit");
+
                     b.Property<Guid?>("OwnerMemberId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("RoomId")
+                    b.Property<Guid?>("RoomId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<byte[]>("RowVersion")
@@ -311,7 +314,7 @@ namespace Habitat.Api.Data.Migrations
 
                     b.ToTable("Tends", t =>
                         {
-                            t.HasCheckConstraint("CK_Tends_KindFields", "([Kind] = 'Habit' AND [FrequencyDays] IS NOT NULL AND [FrequencyDays] BETWEEN 1 AND 3650 AND [CompletedAt] IS NULL) OR ([Kind] = 'Quest' AND [FrequencyDays] IS NULL)");
+                            t.HasCheckConstraint("CK_Tends_KindFields", "([Kind] = 'Habit' AND [RoomId] IS NOT NULL AND [FrequencyDays] IS NOT NULL AND [FrequencyDays] BETWEEN 1 AND 3650 AND [CompletedAt] IS NULL AND [OpenToEveryone] IS NULL) OR ([Kind] = 'Quest' AND [FrequencyDays] IS NULL AND [OpenToEveryone] IS NOT NULL AND [OwnerMemberId] IS NULL)");
                         });
                 });
 
@@ -383,11 +386,10 @@ namespace Habitat.Api.Data.Migrations
                     b.Property<Guid>("LoggedByDeviceId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("RoomId")
+                    b.Property<Guid?>("RoomId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("RoomName")
-                        .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("nvarchar(40)");
 
@@ -466,8 +468,28 @@ namespace Habitat.Api.Data.Migrations
                     b.HasOne("Habitat.Api.Data.Room", null)
                         .WithMany()
                         .HasForeignKey("RoomId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.OwnsMany("Habitat.Api.Data.QuestMember", "AvailableTo", b1 =>
+                        {
+                            b1.Property<Guid>("TendId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<Guid>("MemberId")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.HasKey("TendId", "MemberId");
+
+                            b1.HasIndex("MemberId");
+
+                            b1.ToTable("QuestMembers", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("TendId");
+                        });
+
+                    b.Navigation("AvailableTo");
                 });
 
             modelBuilder.Entity("Habitat.Api.Data.User", b =>

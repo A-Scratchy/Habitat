@@ -9,14 +9,14 @@ public record SyncRoom(Guid Id, string Name, string? Icon, int SortOrder, DateTi
 
 public record SyncMember(Guid Id, string Name, string Animal, bool IsUser, DateTimeOffset UpdatedAt, DateTimeOffset? DeletedAt);
 
-/// <summary>FrequencyDays is set exactly when Kind is Habit; CompletedAt only ever for quests.</summary>
+/// <summary>FrequencyDays and RoomId are always set for habits; quests have no FrequencyDays and may have no room.</summary>
 public record SyncTend(
-    Guid Id, TendKind Kind, string Name, Guid RoomId, string? Group, string? Description, EffortTier Tier, EcologicalImpact Impact, EnergyTag[] Energy,
+    Guid Id, TendKind Kind, string Name, Guid? RoomId, string? Group, string? Description, EffortTier Tier, EcologicalImpact Impact, EnergyTag[] Energy,
     int? FrequencyDays, TendStatus Status, DateTimeOffset? CompletedAt,
-    Guid? OwnerMemberId, Guid? ClaimMemberId, DateOnly? ClaimDay, DateTimeOffset? LastDoneAt, DateTimeOffset UpdatedAt, DateTimeOffset? DeletedAt);
+    Guid? OwnerMemberId, bool? OpenToEveryone, Guid[] AvailableTo, Guid? ClaimMemberId, DateOnly? ClaimDay, DateTimeOffset? LastDoneAt, DateTimeOffset UpdatedAt, DateTimeOffset? DeletedAt);
 
 /// <summary>MemberIds: primary first.</summary>
-public record SyncWin(Guid Id, Guid TendId, string TendName, Guid RoomId, string RoomName, DateTimeOffset At, Guid[] MemberIds, DateTimeOffset? DeletedAt);
+public record SyncWin(Guid Id, Guid TendId, string TendName, Guid? RoomId, string? RoomName, DateTimeOffset At, Guid[] MemberIds, DateTimeOffset? DeletedAt);
 
 /// <summary>
 /// Cursor: pass back as <c>since</c> next time. It's a string because rowversions can outgrow JavaScript numbers.
@@ -62,7 +62,7 @@ public static class SyncEndpoints
             .Select(t => new SyncTend(
                 t.Id, t.Kind, t.Name, t.RoomId, t.Group, t.Description, t.Tier, t.Impact, t.Energy.ToArray(),
                 t.FrequencyDays, t.Status, t.CompletedAt,
-                t.OwnerMemberId, t.ClaimMemberId, t.ClaimDay, t.LastDoneAt, t.UpdatedAt, t.DeletedAt))
+                t.OwnerMemberId, t.OpenToEveryone, t.AvailableTo.Select(a => a.MemberId).ToArray(), t.ClaimMemberId, t.ClaimDay, t.LastDoneAt, t.UpdatedAt, t.DeletedAt))
             .ToArrayAsync();
 
         var wins = await db.Wins

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { entraConfigured, signedInAccount, signIn } from '../auth/entra';
 import { forgetConnection, getMe, readConnection, type MeResponse } from '../data/api';
+import { isDemo } from '../data/example';
 import { ConfirmButton } from './Confirm';
 
 /** This device's place in the habitat. Habits and quests still live only on this device until sync lands. */
@@ -9,6 +10,10 @@ export function AccountAdmin() {
   const account = signedInAccount();
   const [check, setCheck] = useState<{ ok: true; me: MeResponse } | { ok: false; error: string }>();
   const [busy, setBusy] = useState(false);
+
+  if (isDemo()) {
+    return <p className="muted">This is the demo habitat. It stays on this device; leave the demo to sign in and start your own.</p>;
+  }
 
   if (!entraConfigured || !connection) {
     return <p className="muted">This build runs on this device only.</p>;

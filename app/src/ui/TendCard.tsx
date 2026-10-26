@@ -1,7 +1,7 @@
 import { useCallback, useState, type MouseEvent } from 'react';
 import { claimToday, releaseClaim } from '../data/actions';
 import { claimedToday, groupMates, isHandsOff, lastDoneLabel } from '../domain/selection';
-import { ENERGY, IMPACTS, KINDS, TIERS, type Tend } from '../domain/types';
+import { ENERGY, IMPACTS, OUT_AND_ABOUT, KINDS, TIERS, type Tend } from '../domain/types';
 import { NEEDS, needOf } from '../domain/urgency';
 import { useHabitat } from './habitat';
 import { TendSheet } from './TendSheet';
@@ -65,7 +65,7 @@ export function TendCard({ tend, big = false }: { tend: Tend; big?: boolean }) {
         </div>
         <p className="meta">
           {tend.kind === 'quest' && <span className="tag">{KINDS.quest.emoji} Quest</span>}
-          <span>{roomName(tend.roomId)}</span>
+          <span>{tend.roomId ? roomName(tend.roomId) : `${OUT_AND_ABOUT.icon} ${OUT_AND_ABOUT.name}`}</span>
           {tend.impact === 'large' && (
             <span className="tag" title={IMPACTS.large.hint}>
               {IMPACTS.large.emoji} Big impact

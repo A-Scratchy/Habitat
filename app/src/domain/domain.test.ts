@@ -4,7 +4,7 @@ import { DAY, dayKey, daysBetween, parseDay, startOfWeek } from './dates';
 import { parseTendsCsv, tidyText, toTendsCsv } from './csv';
 import { habitatHealth, packTotals, roomHealth } from './health';
 import { mockHistory } from './mock';
-import { browse, completedQuests, groupMates, isHandsOff, isOpen, lastDoneLabel, momentum, pickRandom, quickSet, quickWinsPool, weekSummary } from './selection';
+import { browse, completedQuests, groupMates, isHandsOff, isOpen, lastDoneLabel, momentum, NO_ROOM, pickRandom, quickSet, quickWinsPool, weekSummary } from './selection';
 import type { Habit, Quest, Win } from './types';
 import { needOf, needRatio } from './urgency';
 
@@ -14,7 +14,7 @@ const daysAgo = (n: number) => NOW - n * DAY;
 let seq = 0;
 const base = () => ({ id: `t${++seq}`, name: `Tend ${seq}`, roomId: 'kitchen', tier: 'bee' as const, impact: 'medium' as const, energy: [], status: 'active' as const });
 const habit = (over: Partial<Omit<Habit, 'kind'>> = {}): Habit => ({ ...base(), kind: 'habit', frequencyDays: 7, ...over });
-const quest = (over: Partial<Omit<Quest, 'kind'>> = {}): Quest => ({ ...base(), kind: 'quest', ...over });
+const quest = (over: Partial<Omit<Quest, 'kind'>> = {}): Quest => ({ ...base(), kind: 'quest', availableTo: 'everyone', ...over });
 
 describe('dates', () => {
   it('counts calendar days, not 24h blocks', () => {
@@ -136,6 +136,16 @@ describe('selection', () => {
     expect(browse(all, ctx, 'quest', {}).map((t) => t.id).sort()).toEqual([mend.id, tip.id].sort());
     expect(browse(all, ctx, 'quest', { query: 'blue coat' }).map((t) => t.id)).toEqual([mend.id]);
     expect(isOpen(done)).toBe(false);
+    // Alex (ctx.memberId) sees everyone-quests and their own, never quests just for others.
+    const forAlex = quest({ name: 'Tidy desk', availableTo: ['alex'] });
+    const forRobin = quest({ name: 'Prune rose', availableTo: ['robin'] });
+    const visible = browse([...all, forAlex, forRobin], ctx, 'quest', {}).map((t) => t.id);
+    expect(visible).toContain(forAlex.id);
+    expect(visible).not.toContain(forRobin.id);
+    expect(browse([forRobin], { ...ctx, memberId: 'robin' }, 'quest', {}).map((t) => t.id)).toEqual([forRobin.id]);
+    const shop = quest({ name: 'Top up shop', roomId: undefined });
+    expect(browse([...all, shop], ctx, 'quest', { roomId: NO_ROOM }).map((t) => t.id)).toEqual([shop.id]);
+    expect(browse([...all, shop], ctx, 'quest', { roomId: 'general' }).map((t) => t.id)).toEqual([tip.id]);
     expect(completedQuests(all).map((t) => t.id)).toEqual([done.id, doneEarlier.id]);
   });
 
@@ -160,9 +170,9 @@ describe('selection', () => {
 });
 
 describe('csv import', () => {
-  const HEADER = 'Name,Room,Group,Kind,Description,Effort Tier,Energy Type,Frequency (Days),Last Done Date,Permanent Owner,Status,Ecological Impact';
-  /** Rows in these tests are about other columns, so each gets a valid impact on the end. */
-  const parse = (...rows: string[]) => parseTendsCsv([HEADER, ...rows.map((r) => `${r},Medium`)].join('\n'));
+  const HEADER = 'Name,Room,Group,Kind,Description,Effort Tier,Energy Type,Frequency (Days),Last Done Date,Permanent Owner,Status,Ecological Impact,Available To';
+  /** Rows in these tests are about other columns, so each gets a valid impact, and quests are open to everyone. */
+  const parse = (...rows: string[]) => parseTendsCsv([HEADER, ...rows.map((r) => `${r},Medium,${/,Quest,/.test(r) ? 'Everyone' : ''}`)].join('\n'));
 
   it('tidies spellings and merges case variants', () => {
     expect(tidyText('  Sweep  / Hoover ')).toBe('Sweep/Hoover');
@@ -226,7 +236,7 @@ describe('csv import', () => {
 
     const bad = parseTendsCsv([HEADER, 'Wipe tap,,,Habit,,🐝 Worker Bee Tier,,1,,,,Small', 'Dust,Hall,,Habit,,🐝 Worker Bee Tier,,7,,,,Huge'].join('\n'));
     expect(bad.tends).toEqual([]);
-    expect(bad.errors[0]).toMatch(/^Line 2.*Room is empty/);
+    expect(bad.errors[0]).toMatch(/^Line 2.*a Habit needs a Room/);
     expect(bad.errors[1]).toMatch(/^Line 3.*Ecological Impact must be Small, Medium or Large/);
   });
 
@@ -237,6 +247,32 @@ describe('csv import', () => {
       ['Kitchen', 'large'],
       ['Kitchen', 'small'],
     ]);
+  });
+
+  it('quests say who can take them on; habits never do, and quests have no owner', () => {
+    const ok = parseTendsCsv([HEADER, 'Mend coat,Hall,,Quest,,🐝 Worker Bee Tier,,,,,Active,Small,Leo; Sam', 'Go to tip,,,Quest,,🐘 Elephant Tier,,,,,Active,Large,everyone'].join('\n'));
+    expect(ok.errors).toEqual([]);
+    expect(ok.tends.map((t) => (t.kind === 'quest' ? t.availableToNames : undefined))).toEqual([['Leo', 'Sam'], 'everyone']);
+
+    const bad = parseTendsCsv(
+      [
+        HEADER,
+        'No who,Hall,,Quest,,🐝 Worker Bee Tier,,,,,Active,Small,',
+        'Owned quest,Hall,,Quest,,🐝 Worker Bee Tier,,,,Robin,Active,Small,Everyone',
+        'Habit for some,Hall,,Habit,,🐝 Worker Bee Tier,,7,,,Active,Small,Leo',
+      ].join('\n'),
+    );
+    expect(bad.tends).toEqual([]);
+    expect(bad.errors[0]).toMatch(/^Line 2.*needs Available To/);
+    expect(bad.errors[1]).toMatch(/^Line 3.*don’t have a Permanent Owner/);
+    expect(bad.errors[2]).toMatch(/^Line 4.*only Quests have Available To/);
+  });
+
+  it('a quest with no room is fine: it happens out and about', () => {
+    const { tends, errors } = parse('Go to tip,,,Quest,,🐘 Elephant Tier,,,,,Active');
+    expect(errors).toEqual([]);
+    expect(tends[0]).toMatchObject({ kind: 'quest', name: 'Go to tip' });
+    expect(tends[0].roomName).toBeUndefined();
   });
 
   it('rejects the same name twice in one room', () => {

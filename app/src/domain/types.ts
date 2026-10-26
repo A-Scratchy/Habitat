@@ -34,7 +34,6 @@ export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omi
 interface TendBase {
   id: string;
   name: string;
-  roomId: string;
   group?: string;
   /** Notes or step-by-step instructions; one step per line. */
   description?: string;
@@ -44,14 +43,16 @@ interface TendBase {
   status: TendStatus;
   /** Epoch ms. Missing means "not yet known", which is never treated as overdue. */
   lastDone?: number;
-  /** Permanent owner: "this is my zone". */
-  ownerId?: string;
   claim?: Claim;
 }
 
 /** Comes back on a schedule. Always has one. */
 export interface Habit extends TendBase {
   kind: 'habit';
+  /** A habit always belongs to a room. */
+  roomId: string;
+  /** Permanent owner: "this is my zone". */
+  ownerId?: string;
   /** Repeat interval in days. */
   frequencyDays: number;
   completedAt?: never;
@@ -60,6 +61,11 @@ export interface Habit extends TendBase {
 /** A one-off. Never has a schedule; when done it moves to the Completed shelf. */
 export interface Quest extends TendBase {
   kind: 'quest';
+  /** Missing means it has no room: it's done out and about ("Go to tip"). */
+  roomId?: string;
+  /** Who can take it on: everyone, or particular members (at least one). It only shows on their Quests menu. */
+  availableTo: 'everyone' | string[];
+  ownerId?: never;
   frequencyDays?: never;
   /** When it was finished. Set means it's on the Completed shelf; restarting clears it. */
   completedAt?: number;
@@ -78,9 +84,10 @@ export interface Win {
   id: string;
   tendId: string;
   tendName: string;
-  roomId: string;
+  /** Missing for a quest done out and about. */
+  roomId?: string;
   /** The room's name when it was done, so the feed still reads right after a rename. */
-  room: string;
+  room?: string;
   memberId: string;
   /** Others tagged as having helped. */
   helperIds?: string[];
@@ -111,6 +118,9 @@ export const IMPACTS: Record<EcologicalImpact, { emoji: string; label: string; w
 };
 
 export const roomIcon = (r: Room | undefined) => r?.icon || '🏠';
+
+/** How a quest with no room is shown. */
+export const OUT_AND_ABOUT = { icon: '🚶', name: 'Out and about' };
 
 export const byRoomOrder = (a: Room, b: Room) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name);
 

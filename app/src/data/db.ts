@@ -52,6 +52,25 @@ function open(name: string): HabitatDexie {
         w.roomId = idOf.get(w.room as string) ?? '';
       });
     });
+  // Quests now say who can take them on, replacing their owner one-for-one: a quest owned by
+  // someone becomes available to just them; an unowned quest is open to everyone.
+  d.version(4)
+    .stores({
+      rooms: 'id, name',
+      tends: 'id, kind, status, roomId',
+      members: 'id',
+      wins: 'id, at',
+    })
+    .upgrade((tx) =>
+      tx
+        .table('tends')
+        .toCollection()
+        .modify((t: Record<string, unknown>) => {
+          if (t.kind !== 'quest') return;
+          t.availableTo = typeof t.ownerId === 'string' ? [t.ownerId] : 'everyone';
+          delete t.ownerId;
+        }),
+    );
   return d;
 }
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { restartQuest } from '../data/actions';
-import { browse, completedQuests, pickRandom } from '../domain/selection';
-import { ENERGY, ENERGY_ORDER, KINDS, roomIcon, TIER_ORDER, TIERS, type EffortTier, type EnergyTag, type TendKind } from '../domain/types';
+import { browse, completedQuests, NO_ROOM, pickRandom } from '../domain/selection';
+import { ENERGY, ENERGY_ORDER, KINDS, OUT_AND_ABOUT, roomIcon, TIER_ORDER, TIERS, type EffortTier, type EnergyTag, type TendKind } from '../domain/types';
 import { needOf } from '../domain/urgency';
 import { useHabitat } from './habitat';
 import { TendCard } from './TendCard';
@@ -34,10 +34,14 @@ export function Browse({ kind, initialRoomId }: { kind: TendKind; initialRoomId?
   const filter = { query, tiers, energy };
   const everything = browse(tends, ctx, kind, filter, roomName);
   // Rooms in your chosen order, showing only the ones with something open of this kind.
-  const rooms = allRooms.filter((r) => everything.some((t) => t.roomId === r.id));
-  const choosingRoom = !roomId && !query.trim();
+  const rooms: { id: string; name: string; icon: string }[] = allRooms
+    .filter((r) => everything.some((t) => t.roomId === r.id))
+    .map((r) => ({ id: r.id, name: r.name, icon: roomIcon(r) }));
+  if (everything.some((t) => !t.roomId)) rooms.push({ id: NO_ROOM, ...OUT_AND_ABOUT });
+  // Habits start from "Where are you?"; quests show the whole list, with rooms as an optional filter.
+  const choosingRoom = kind === 'habit' && !roomId && !query.trim();
   const results = choosingRoom ? [] : browse(tends, ctx, kind, { ...filter, roomId }, roomName);
-  const room = roomId ? roomById.get(roomId) : undefined;
+  const room = roomId === NO_ROOM ? OUT_AND_ABOUT : roomId ? { name: roomById.get(roomId)?.name ?? '', icon: roomIcon(roomById.get(roomId)) } : undefined;
   const surprise = everything.find((t) => t.id === surpriseId);
 
   return (
@@ -85,19 +89,32 @@ export function Browse({ kind, initialRoomId }: { kind: TendKind; initialRoomId?
         ))}
       </div>
 
+      {kind === 'quest' && rooms.length > 0 && (
+        <div className="chips" role="group" aria-label="Filter by room (optional)">
+          <button className={`chip${!roomId ? ' on' : ''}`} aria-pressed={!roomId} onClick={() => setRoomId(undefined)}>
+            All rooms
+          </button>
+          {rooms.map((r) => (
+            <button key={r.id} className={`chip${roomId === r.id ? ' on' : ''}`} aria-pressed={roomId === r.id} onClick={() => setRoomId(roomId === r.id ? undefined : r.id)}>
+              {r.icon} {r.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {choosingRoom ? (
         <>
           <h3 className="section-title">Where are you?</h3>
           {rooms.length === 0 && <p className="empty">{kind === 'habit' ? 'No habits yet. Add some in the Tending tab.' : 'No open quests. Add one in the Tending tab.'}</p>}
           <div className="rooms">
             {rooms.map((r) => {
-              const here = everything.filter((t) => t.roomId === r.id);
+              const here = everything.filter((t) => (r.id === NO_ROOM ? !t.roomId : t.roomId === r.id));
               const thirsty = here.filter((t) => ['thirsty', 'wilting'].includes(needOf(t, ctx.now))).length;
               const noun = here.length === 1 ? KINDS[kind].label.toLowerCase() : KINDS[kind].plural.toLowerCase();
               return (
                 <button key={r.id} className="room-tile" onClick={() => setRoomId(r.id)}>
                   <span className="room-emoji" aria-hidden>
-                    {roomIcon(r)}
+                    {r.icon}
                   </span>
                   <span className="room-name">{r.name}</span>
                   <span className="muted small">
@@ -108,22 +125,23 @@ export function Browse({ kind, initialRoomId }: { kind: TendKind; initialRoomId?
               );
             })}
           </div>
-          {kind === 'quest' && <CompletedShelf />}
         </>
       ) : (
         <>
-          <div className="room-bar">
-            <button className="link" onClick={() => setRoomId(undefined)}>
-              ← All rooms
-            </button>
-            {room && (
-              <span className="here">
-                {roomIcon(room)} {room.name}
-              </span>
-            )}
-          </div>
+          {kind === 'habit' && (
+            <div className="room-bar">
+              <button className="link" onClick={() => setRoomId(undefined)}>
+                ← All rooms
+              </button>
+              {room && (
+                <span className="here">
+                  {room.icon} {room.name}
+                </span>
+              )}
+            </div>
+          )}
           {results.length === 0 ? (
-            <p className="empty">{copy.empty}</p>
+            <p className="empty">{kind === 'quest' && everything.length === 0 && !query.trim() ? 'No open quests for you right now 🗺️' : copy.empty}</p>
           ) : (
             <div className="cards">
               {results.map((t) => (
@@ -133,6 +151,8 @@ export function Browse({ kind, initialRoomId }: { kind: TendKind; initialRoomId?
           )}
         </>
       )}
+
+      {kind === 'quest' && <CompletedShelf />}
     </section>
   );
 }
@@ -153,7 +173,7 @@ function CompletedShelf() {
           <li key={q.id} className="completed-row">
             <span>
               {q.name}
-               <span className="muted small"> · {roomName(q.roomId)} · {new Date(q.completedAt!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+               <span className="muted small"> · {q.roomId ? roomName(q.roomId) : OUT_AND_ABOUT.name} · {new Date(q.completedAt!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
             </span>
             <button className="btn-soft" onClick={() => void restartQuest(q.id)}>
               Restart

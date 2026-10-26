@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { deleteRoom, deleteTend, moveRoom, restartQuest, saveRoom, saveTend } from '../data/actions';
 import { dayKey, parseDay } from '../domain/dates';
-import { completedQuests, matchesQuery } from '../domain/selection';
+import { completedQuests, matchesQuery, NO_ROOM } from '../domain/selection';
 import {
   DESCRIPTION_MAX,
   ENERGY,
@@ -9,6 +9,7 @@ import {
   IMPACT_ORDER,
   IMPACTS,
   KINDS,
+  OUT_AND_ABOUT,
   roomIcon,
   STATUSES,
   TIER_ORDER,
@@ -32,7 +33,7 @@ interface Form {
   id?: string;
   kind: TendKind;
   name: string;
-  /** Empty until chosen: a tend's room is never assumed. */
+  /** Empty until chosen: a tend's room is never assumed. NO_ROOM is a quest's explicit "no room". */
   roomId: string;
   group: string;
   description: string;
@@ -41,7 +42,10 @@ interface Form {
   tier: EffortTier;
   energy: EnergyTag[];
   status: TendStatus;
+  /** Habits only: permanent owner, or '' for anyone. */
   ownerId: string;
+  /** Quests only. Empty until chosen: who can take it on is never assumed. */
+  availableTo: 'everyone' | string[] | '';
   /** Habits only. Empty until someone types a number: a habit's schedule is never assumed. */
   frequency: string;
   lastDone: string;
@@ -60,6 +64,7 @@ const blankForm = (kind: TendKind): Form => ({
   energy: [],
   status: 'active',
   ownerId: '',
+  availableTo: '',
   frequency: '',
   lastDone: '',
 });
@@ -68,14 +73,15 @@ const toForm = (t: Tend): Form => ({
   id: t.id,
   kind: t.kind,
   name: t.name,
-  roomId: t.roomId,
+  roomId: t.roomId ?? NO_ROOM,
   group: t.group ?? '',
   description: t.description ?? '',
   impact: t.impact,
   tier: t.tier,
   energy: t.energy,
   status: t.status,
-  ownerId: t.ownerId ?? '',
+  ownerId: t.kind === 'habit' ? (t.ownerId ?? '') : '',
+  availableTo: t.kind === 'quest' ? t.availableTo : '',
   frequency: t.kind === 'habit' ? String(t.frequencyDays) : '',
   lastDone: t.lastDone != null ? dayKey(t.lastDone) : '',
   completedAt: t.kind === 'quest' ? t.completedAt : undefined,
@@ -85,28 +91,38 @@ const toForm = (t: Tend): Form => ({
 function toTend(f: Form): { tend: Parameters<typeof saveTend>[0] } | { errors: string[] } {
   const errors: string[] = [];
   if (!f.name.trim()) errors.push('Give it a name.');
-  if (!f.roomId) errors.push('Choose which room it belongs to.');
+  if (!f.roomId) errors.push(f.kind === 'quest' ? 'Choose a room, or “No room” for a quest done out and about.' : 'Choose which room it belongs to.');
+  if (f.kind === 'habit' && f.roomId === NO_ROOM) errors.push('A habit needs a room. (Only quests can have none.)');
   if (!f.impact) errors.push('Choose its ecological impact: how much the room suffers if it waits.');
+  if (f.kind === 'quest' && (f.availableTo === '' || (Array.isArray(f.availableTo) && f.availableTo.length === 0)))
+    errors.push('Choose who can take this quest on: everyone, or particular members.');
   if (f.description.length > DESCRIPTION_MAX) errors.push(`Keep the description under ${DESCRIPTION_MAX} characters.`);
   const days = Number(f.frequency);
   if (f.kind === 'habit' && !(Number.isInteger(days) && days >= 1 && days <= 3650)) errors.push('A habit needs to say how often: every 1 to 3650 days.');
-  if (errors.length || !f.impact) return { errors };
+  if (errors.length || !f.impact || (f.kind === 'quest' && f.availableTo === '')) return { errors };
 
   const common = {
     id: f.id,
     name: f.name.trim(),
-    roomId: f.roomId,
     impact: f.impact,
     ...(f.group.trim() && { group: f.group.trim() }),
     ...(f.description.trim() && { description: f.description.trim() }),
     tier: f.tier,
     energy: f.energy,
     status: f.status,
-    ...(f.ownerId && { ownerId: f.ownerId }),
     ...(f.lastDone && { lastDone: parseDay(f.lastDone) }),
   };
   return {
-    tend: f.kind === 'habit' ? { ...common, kind: 'habit', frequencyDays: days } : { ...common, kind: 'quest', ...(f.completedAt != null && { completedAt: f.completedAt }) },
+    tend:
+      f.kind === 'habit'
+        ? { ...common, kind: 'habit', roomId: f.roomId, frequencyDays: days, ...(f.ownerId && { ownerId: f.ownerId }) }
+        : {
+            ...common,
+            kind: 'quest',
+            availableTo: f.availableTo as 'everyone' | string[],
+            ...(f.roomId !== NO_ROOM && { roomId: f.roomId }),
+            ...(f.completedAt != null && { completedAt: f.completedAt }),
+          },
   };
 }
 
@@ -167,6 +183,11 @@ function TendEditor({ initial, onClose }: { initial: Form; onClose(): void }) {
                 {roomIcon(r)} {r.name}
               </option>
             ))}
+            {f.kind === 'quest' && (
+              <option value={NO_ROOM}>
+                {OUT_AND_ABOUT.icon} No room (out and about)
+              </option>
+            )}
             <option value="__new">＋ New room…</option>
           </select>
         </label>
@@ -270,17 +291,43 @@ function TendEditor({ initial, onClose }: { initial: Form; onClose(): void }) {
         </label>
       </div>
 
-      <label className="field">
-        <span>Permanent owner</span>
-        <select value={f.ownerId} onChange={(e) => set({ ownerId: e.target.value })}>
-          <option value="">Anyone</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.animal} {m.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      {f.kind === 'habit' ? (
+        <label className="field">
+          <span>Permanent owner</span>
+          <select value={f.ownerId} onChange={(e) => set({ ownerId: e.target.value })}>
+            <option value="">Anyone</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.animal} {m.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <fieldset className="field">
+          <legend>Who can take it on? It only appears on their Quests menu.</legend>
+          <div className="chips wrap">
+            <button type="button" className={`chip${f.availableTo === 'everyone' ? ' on' : ''}`} aria-pressed={f.availableTo === 'everyone'} onClick={() => set({ availableTo: 'everyone' })}>
+              🐾 Everyone
+            </button>
+            {members.map((m) => {
+              const on = Array.isArray(f.availableTo) && f.availableTo.includes(m.id);
+              const picked = Array.isArray(f.availableTo) ? f.availableTo : [];
+              return (
+                <button
+                  type="button"
+                  key={m.id}
+                  className={`chip${on ? ' on' : ''}`}
+                  aria-pressed={on}
+                  onClick={() => set({ availableTo: on ? picked.filter((x) => x !== m.id) : [...picked, m.id] })}
+                >
+                  {m.animal} {m.name}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+      )}
 
       {errors.length > 0 && (
         <ul className="panel error small report">
@@ -317,7 +364,9 @@ type View = 'habit' | 'quest' | 'completed' | 'rooms';
 
 /** The master list of habits, quests and rooms, to add, change, pause, remove or restart. */
 export function Tending() {
-  const { tends, rooms, roomById, roomName } = useHabitat();
+  const { tends, rooms, roomById, roomName, memberById } = useHabitat();
+  const questFor = (a: 'everyone' | string[]) =>
+    a === 'everyone' ? 'for everyone' : a.length === 0 ? '⚠️ nobody can take it on' : `for ${a.map((id) => memberById.get(id)?.name ?? '?').join(', ')}`;
   const [view, setView] = useState<View>('habit');
   const [query, setQuery] = useState('');
   const [paused, setPaused] = useState(false);
@@ -330,7 +379,8 @@ export function Tending() {
     completed: completed.length,
     rooms: rooms.length,
   };
-  const roomOrder = (id: string) => roomById.get(id)?.sortOrder ?? Number.MAX_SAFE_INTEGER;
+  // Quests with no room sort last.
+  const roomOrder = (id?: string) => (id ? (roomById.get(id)?.sortOrder ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER);
   const inView = view === 'completed' ? completed : tends.filter((t) => t.kind === view && (view === 'habit' || t.completedAt == null));
   const shown = inView
     .filter((t) => matchesQuery(t, query, roomName(t.roomId)) && (!paused || t.status === 'paused'))
@@ -343,8 +393,9 @@ export function Tending() {
         {t.description ? ' 📝' : ''}
       </span>
       <span className="muted small">
-        {showRoom ? `${roomName(t.roomId)} · ` : ''}
+        {showRoom ? `${t.roomId ? roomName(t.roomId) : OUT_AND_ABOUT.name} · ` : ''}
         {t.kind === 'habit' ? `every ${t.frequencyDays}d` : t.completedAt != null ? `done ${new Date(t.completedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : 'one-off'}
+        {t.kind === 'quest' && ` · ${questFor(t.availableTo)}`}
         {` · ${IMPACTS[t.impact].label} impact`}
         {t.status === 'paused' ? ' · Paused' : ''}
       </span>
@@ -354,7 +405,10 @@ export function Tending() {
 
   // Searching shows matches flat; otherwise rooms stay folded, so it's never a wall of 200 tends.
   const flat = query.trim() !== '' || paused || view === 'completed';
-  const roomsShown = rooms.filter((r) => shown.some((t) => t.roomId === r.id));
+  const roomsShown: { id: string; name: string; icon: string }[] = rooms
+    .filter((r) => shown.some((t) => t.roomId === r.id))
+    .map((r) => ({ id: r.id, name: r.name, icon: roomIcon(r) }));
+  if (shown.some((t) => !t.roomId)) roomsShown.push({ id: NO_ROOM, ...OUT_AND_ABOUT });
   const views: [View, string][] = [
     ['habit', `${KINDS.habit.emoji} Habits`],
     ['quest', `${KINDS.quest.emoji} Quests`],
@@ -425,12 +479,12 @@ export function Tending() {
               ) : (
                 <div className="stack">
                   {roomsShown.map((room) => {
-                    const inRoom = shown.filter((t) => t.roomId === room.id);
+                    const inRoom = shown.filter((t) => (room.id === NO_ROOM ? !t.roomId : t.roomId === room.id));
                     return (
                       <details key={room.id} className="room-group">
                         <summary>
                           <span>
-                            {roomIcon(room)} {room.name}
+                            {room.icon} {room.name}
                           </span>
                           <span className="muted small">{inRoom.length}</span>
                         </summary>

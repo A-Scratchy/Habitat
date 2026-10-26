@@ -1,4 +1,5 @@
 import { readConnection } from '../data/api';
+import { isDemo } from '../data/example';
 import { habitatHealth, HEALTH, packTotals, roomHealth, type Health } from '../domain/health';
 import { roomIcon, type Room } from '../domain/types';
 import { useHabitat } from './habitat';
@@ -27,7 +28,7 @@ export function Overview({ onOpenRoom }: { onOpenRoom(room: Room): void }) {
   const { rooms, tends, wins, ctx } = useHabitat();
   const overall = habitatHealth(tends, ctx.now);
   const totals = packTotals(wins, ctx.now);
-  const name = readConnection()?.householdName ?? 'Our Habitat';
+  const name = isDemo() ? 'Demo habitat' : (readConnection()?.householdName ?? 'Our Habitat');
 
   return (
     <section className="screen">

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { entraConfigured, signedInAccount, signOut } from '../auth/entra';
 import { readConnection } from '../data/api';
+import { isDemo, leaveDemo } from '../data/example';
 import { saveMember } from '../data/actions';
 import { useHabitat } from './habitat';
 import { ConfirmButton } from './Confirm';
@@ -33,7 +34,7 @@ export function ProfileSheet({ onClose, onOpenAccountSettings }: { onClose(): vo
           </span>
           <div>
             <h3 id="profile-title">{me.name}</h3>
-            <p className="muted small">{connection ? `In ${connection.householdName ?? 'your habitat'}` : 'On this device only'}</p>
+            <p className="muted small">{isDemo() ? 'In the demo habitat' : connection ? `In ${connection.householdName ?? 'your habitat'}` : 'On this device only'}</p>
           </div>
           <button className="icon-btn" onClick={onClose} aria-label="Close">
             ✕
@@ -74,7 +75,16 @@ export function ProfileSheet({ onClose, onOpenAccountSettings }: { onClose(): vo
           🔄 Someone else is using this device
         </button>
 
-        {entraConfigured && (
+        {isDemo() && (
+          <div className="panel stack">
+            <p className="small muted">You’re exploring the demo. Leave it to sign in and start your own habitat.</p>
+            <button className="btn-soft" onClick={() => void leaveDemo()}>
+              Leave demo
+            </button>
+          </div>
+        )}
+
+        {entraConfigured && !isDemo() && (
           <div className="panel stack">
             {account ? (
               <>

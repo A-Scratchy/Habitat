@@ -143,7 +143,8 @@ public class Tend : HouseholdEntity, ISynced
 {
     public TendKind Kind { get; set; }
     public required string Name { get; set; }
-    public Guid RoomId { get; set; }
+    /// <summary>Required for habits; optional for quests (e.g. "Go to tip" happens out and about).</summary>
+    public Guid? RoomId { get; set; }
     public string? Group { get; set; }
     /// <summary>Notes or step-by-step instructions, one step per line.</summary>
     public string? Description { get; set; }
@@ -155,7 +156,12 @@ public class Tend : HouseholdEntity, ISynced
     public TendStatus Status { get; set; }
     /// <summary>Quests only: when it was finished. Set means it's on the Completed shelf.</summary>
     public DateTimeOffset? CompletedAt { get; set; }
+    /// <summary>Habits only: "this is my zone". Quests use OpenToEveryone / AvailableTo instead.</summary>
     public Guid? OwnerMemberId { get; set; }
+    /// <summary>Quests only (required for them): true when anyone can take it on.</summary>
+    public bool? OpenToEveryone { get; set; }
+    /// <summary>Quests only: who can take it on when it isn't open to everyone. It shows only on their Quests menu.</summary>
+    public List<QuestMember> AvailableTo { get; set; } = [];
     public Guid? ClaimMemberId { get; set; }
     /// <summary>Household-local date the claim is for. A claim from another day has lapsed.</summary>
     public DateOnly? ClaimDay { get; set; }
@@ -174,8 +180,9 @@ public class Win : HouseholdEntity, ISynced
     public Guid TendId { get; set; }
     /// <summary>Snapshots, so the feed still reads right if the tend or room is renamed or removed.</summary>
     public required string TendName { get; set; }
-    public Guid RoomId { get; set; }
-    public required string RoomName { get; set; }
+    /// <summary>Null for a quest done out and about, with no room.</summary>
+    public Guid? RoomId { get; set; }
+    public string? RoomName { get; set; }
     /// <summary>When it was done; may be backdated.</summary>
     public DateTimeOffset At { get; set; }
     /// <summary>When it was recorded.</summary>
@@ -187,6 +194,12 @@ public class Win : HouseholdEntity, ISynced
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
     public long RowVersion { get; set; }
+}
+
+/// <summary>A member who may take on a quest that isn't open to everyone.</summary>
+public class QuestMember
+{
+    public Guid MemberId { get; set; }
 }
 
 /// <summary>Everyone credited with a win. The first-tagged person is primary.</summary>

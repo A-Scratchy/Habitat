@@ -43,7 +43,7 @@ public static class WinEndpoints
 
         var tend = await db.Tends.FirstOrDefaultAsync(t => t.Id == input.TendId && t.DeletedAt == null);
         if (tend is null) return TypedResults.NotFound();
-        var roomName = await db.Rooms.Where(r => r.Id == tend.RoomId).Select(r => r.Name).FirstAsync();
+        var roomName = tend.RoomId is null ? null : await db.Rooms.Where(r => r.Id == tend.RoomId).Select(r => r.Name).FirstAsync();
 
         // Doing an open quest finishes it: it moves to the Completed shelf.
         var finishesQuest = tend.Kind == TendKind.Quest && tend.CompletedAt is null;

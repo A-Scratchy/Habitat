@@ -61,9 +61,11 @@ public static class MemberEndpoints
         member.UpdatedAt = now;
         // Their login (if any) goes with them, and their zones and claims are freed up.
         db.Users.RemoveRange(await db.Users.Where(u => u.MemberId == id).ToListAsync());
-        foreach (var tend in await db.Tends.Where(c => c.OwnerMemberId == id || c.ClaimMemberId == id).ToListAsync())
+        // A quest only they could do is left with nobody; Tending flags it so it can be reassigned.
+        foreach (var tend in await db.Tends.Where(c => c.OwnerMemberId == id || c.ClaimMemberId == id || c.AvailableTo.Any(a => a.MemberId == id)).ToListAsync())
         {
             if (tend.OwnerMemberId == id) tend.OwnerMemberId = null;
+            tend.AvailableTo.RemoveAll(a => a.MemberId == id);
             if (tend.ClaimMemberId == id) (tend.ClaimMemberId, tend.ClaimDay) = (null, null);
             tend.UpdatedAt = now;
         }

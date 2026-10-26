@@ -1,5 +1,5 @@
 import { dayKey, daysBetween, HOUR, startOfWeek } from './dates';
-import { isCompleted, isHabit, TIER_ORDER, type EffortTier, type EnergyTag, type Tend, type TendKind, type Win } from './types';
+import { isCompleted, isHabit, OUT_AND_ABOUT, TIER_ORDER, type EffortTier, type EnergyTag, type Tend, type TendKind, type Win } from './types';
 import { needOf, needRatio } from './urgency';
 
 export interface ViewContext {
@@ -15,6 +15,10 @@ export const isClaimedByOther = (t: Tend, ctx: ViewContext) =>
   claimedToday(t, ctx.now) && t.claim!.memberId !== ctx.memberId;
 
 export const isOwnedByOther = (t: Tend, ctx: ViewContext) => !!t.ownerId && t.ownerId !== ctx.memberId;
+
+/** Habits are anyone's; a quest only for the members it names (or everyone). */
+export const isAvailableTo = (t: Tend, memberId: string | undefined) =>
+  t.kind === 'habit' || t.availableTo === 'everyone' || (!!memberId && t.availableTo.includes(memberId));
 
 /** Someone else's zone or someone else's job today: hide the Done button and keep it out of suggestions. */
 export const isHandsOff = (t: Tend, ctx: ViewContext) => isOwnedByOther(t, ctx) || isClaimedByOther(t, ctx);
@@ -71,7 +75,11 @@ export function pickRandom<T extends { id: string }>(pool: T[], excludeId?: stri
   return options[Math.floor(rnd() * options.length)];
 }
 
+/** Pseudo-room for quests that have no room (done out and about). */
+export const NO_ROOM = '__out-and-about';
+
 export interface BrowseFilter {
+  /** A room id, or NO_ROOM for quests without one. */
   roomId?: string;
   query?: string;
   tiers?: EffortTier[];
@@ -90,9 +98,10 @@ export function matchesQuery(t: Tend, query: string, roomName = ''): boolean {
  * recently done, since some habits need doing again sooner than their schedule says. Paused tends
  * and finished quests never show here (they live in the Tending tab and the Completed shelf).
  */
-export function browse(tends: Tend[], ctx: ViewContext, kind: TendKind, f: BrowseFilter, roomName: (id: string) => string = () => ''): Tend[] {
+export function browse(tends: Tend[], ctx: ViewContext, kind: TendKind, f: BrowseFilter, roomName: (id?: string) => string = () => ''): Tend[] {
   const rank = (t: Tend) => needRatio(t, ctx.now) ?? -1;
-  const inScope = (t: Tend) => isOpen(t) && t.kind === kind && (!f.roomId || t.roomId === f.roomId);
+  const inRoom = (t: Tend) => (f.roomId === NO_ROOM ? !t.roomId : !f.roomId || t.roomId === f.roomId);
+  const inScope = (t: Tend) => isOpen(t) && t.kind === kind && inRoom(t) && isAvailableTo(t, ctx.memberId);
   return tends
     .filter(
       (t) =>
@@ -135,7 +144,7 @@ export interface WeekSummary {
 export function weekSummary(wins: Win[], now: number): WeekSummary {
   const week = winsSince(wins, startOfWeek(now));
   const rooms = new Map<string, number>();
-  for (const w of week) rooms.set(w.room, (rooms.get(w.room) ?? 0) + 1);
+  for (const w of week) rooms.set(w.room ?? OUT_AND_ABOUT.name, (rooms.get(w.room ?? OUT_AND_ABOUT.name) ?? 0) + 1);
   return {
     total: week.length,
     helpers: new Set(week.flatMap(winMembers)).size,

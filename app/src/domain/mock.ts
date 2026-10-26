@@ -28,7 +28,7 @@ export function mockHistory(
     if (daysAgo <= 6 && members.length) {
       const owner = members.find((m) => m.id === t.ownerId);
       const member = owner ?? members[Math.floor(rnd() * members.length)];
-      wins.push({ id: newId(), tendId: t.id, tendName: t.name, roomId: t.roomId, room: roomName.get(t.roomId) ?? '', memberId: member.id, at });
+      wins.push({ id: newId(), tendId: t.id, tendName: t.name, ...(t.roomId && { roomId: t.roomId, room: roomName.get(t.roomId) }), memberId: member.id, at });
     }
     return { ...t, lastDone: at };
   });

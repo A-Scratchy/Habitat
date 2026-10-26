@@ -3,8 +3,10 @@ import { entraConfigured } from './auth/entra';
 import { adoptServerMember } from './data/actions';
 import { ApiError, CONNECTION_EVENT, forgetConnection, getMe, readConnection, saveConnection } from './data/api';
 import { db, selectHabitatDb } from './data/db';
+import { DEMO_HABITAT_ID, isDemo } from './data/example';
 import { Browse } from './ui/Browse';
 import { BusyScreen } from './ui/Busy';
+import { DemoBanner } from './ui/Demo';
 import { Tending } from './ui/Tending';
 import { HabitatProvider, useHabitat, writeLocal } from './ui/habitat';
 import { WhoIsHere } from './ui/Members';
@@ -65,6 +67,8 @@ function Main() {
         </div>
       </header>
 
+      {isDemo() && <DemoBanner />}
+
       <main>
         {tab === 'habitat' && (
           <Overview
@@ -108,17 +112,17 @@ function Main() {
 
 /** Re-reads this device's connection whenever it changes (connect, disconnect, sign out). */
 function useConnection() {
-  const [connection, setConnection] = useState(readConnection);
+  const [state, setState] = useState(() => ({ connection: readConnection(), demo: isDemo() }));
   useEffect(() => {
-    const update = () => setConnection(readConnection());
+    const update = () => setState({ connection: readConnection(), demo: isDemo() });
     window.addEventListener(CONNECTION_EVENT, update);
     return () => window.removeEventListener(CONNECTION_EVENT, update);
   }, []);
-  return connection;
+  return state;
 }
 
 export function App() {
-  const connection = useConnection();
+  const { connection, demo } = useConnection();
   const [adopting, setAdopting] = useState(false);
   const [lookupError, setLookupError] = useState<string>();
   const missingHouseholdId = entraConfigured && connection?.status === 'approved' && !connection.householdId;
@@ -134,6 +138,16 @@ export function App() {
         else setLookupError(e instanceof Error ? e.message : 'Couldn’t reach the Habitat server.');
       });
   }, [missingHouseholdId, connection]);
+
+  // The demo needs no sign-in and no server: it lives in its own local database.
+  if (demo) {
+    selectHabitatDb(DEMO_HABITAT_ID);
+    return (
+      <HabitatProvider key={db.name} loading={<BusyScreen message="Opening the demo habitat…" />}>
+        {() => <Main />}
+      </HabitatProvider>
+    );
+  }
 
   // With sign-in configured, nothing opens until this device belongs to a habitat.
   if (entraConfigured && (!connection || connection.status === 'pending' || adopting)) {

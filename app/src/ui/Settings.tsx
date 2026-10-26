@@ -6,7 +6,7 @@ import { AccountAdmin } from './Account';
 import { ConfirmButton, ConfirmPanel } from './Confirm';
 import { AnimalPicker, NewMemberForm } from './Members';
 import { useHabitat } from './habitat';
-import { loadExample } from './Welcome';
+import { loadExample } from '../data/example';
 
 function MembersAdmin() {
   const { members, me, setMe } = useHabitat();

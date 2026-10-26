@@ -1,15 +1,11 @@
 import { useState } from 'react';
 import { readConnection } from '../data/api';
 import { importTends } from '../data/actions';
+import { loadExample } from '../data/example';
 import { parseTendsCsv } from '../domain/csv';
 import { SignInStatus } from './Busy';
 import { NewMemberForm } from './Members';
 import { useHabitat } from './habitat';
-
-export async function loadExample(): Promise<number> {
-  const text = await (await fetch(`${import.meta.env.BASE_URL}sample-habitat.csv`)).text();
-  return importTends(parseTendsCsv(text).tends, { replace: true, mockDates: true });
-}
 
 /** First run of a habitat on this device: nobody and no habits or quests here yet. */
 export function Welcome() {

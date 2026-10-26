@@ -1,24 +1,22 @@
 import { dayKey, DAY, timeOfDay } from '../domain/dates';
-import { winMembers } from '../domain/selection';
-import type { Win } from '../domain/types';
+import { OUT_AND_ABOUT, roomIcon, type Win } from '../domain/types';
 import { useHabitat } from './habitat';
 
 function WinRow({ win }: { win: Win }) {
-  const { memberById } = useHabitat();
-  const pack = winMembers(win).map((id) => memberById.get(id));
-  const names = pack.map((m) => m?.name ?? 'Someone');
-  const who = names.length > 1 ? `${names.slice(0, -1).join(', ')} & ${names.at(-1)}` : names[0];
+  const { roomById } = useHabitat();
+  // It's about the pack, never who: no names or personal animals, just what was looked after.
+  const icon = win.roomId ? roomIcon(roomById.get(win.roomId)) : OUT_AND_ABOUT.icon;
   return (
     <li className="win">
       <span className="avatar" aria-hidden>
-        {pack.map((m) => m?.animal ?? '🌱').join('')}
+        {icon}
       </span>
       <div>
         <p>
-          <strong>{who}</strong> looked after <strong>{win.tendName}</strong>
+          The pack looked after <strong>{win.tendName}</strong>
         </p>
         <p className="muted small">
-          {win.room} · {timeOfDay(win.at)}
+          {win.room ?? OUT_AND_ABOUT.name} · {timeOfDay(win.at)}
         </p>
       </div>
     </li>

@@ -17,9 +17,17 @@ import {
 
 /**
  * A row ready to import. Rooms are named, not yet linked: the import finds or creates each room by name.
+ * Habits always have a roomName; a quest without one has no room (out and about).
  * `completed`: a quest the file marks Done (it goes straight to the Completed shelf).
  */
-export type ParsedTend = DistributiveOmit<Tend, 'id' | 'ownerId' | 'claim' | 'completedAt' | 'roomId'> & { roomName: string; ownerName?: string; completed?: boolean };
+export type ParsedTend = DistributiveOmit<Tend, 'id' | 'ownerId' | 'claim' | 'completedAt' | 'roomId' | 'availableTo'> & {
+  roomName?: string;
+  /** Habits only. */
+  ownerName?: string;
+  /** Quests only: "everyone", or member names (members are matched or created by name on import). */
+  availableToNames?: 'everyone' | string[];
+  completed?: boolean;
+};
 
 /** Any error stops the import: `tends` is then empty and nothing is saved. */
 export interface ParseResult {
@@ -27,7 +35,7 @@ export interface ParseResult {
   errors: string[];
 }
 
-type Field = 'name' | 'room' | 'group' | 'description' | 'kind' | 'impact' | 'tier' | 'energy' | 'frequency' | 'lastDone' | 'owner' | 'status';
+type Field = 'name' | 'room' | 'group' | 'description' | 'kind' | 'availableTo' | 'impact' | 'tier' | 'energy' | 'frequency' | 'lastDone' | 'owner' | 'status';
 
 const HEADER_ALIASES: Record<string, Field> = {
   chorename: 'name',
@@ -35,6 +43,7 @@ const HEADER_ALIASES: Record<string, Field> = {
   name: 'name',
   tend: 'name',
   kind: 'kind',
+  availableto: 'availableTo',
   ecologicalimpact: 'impact',
   impact: 'impact',
   description: 'description',
@@ -152,7 +161,18 @@ export function parseTendsCsv(text: string): ParseResult {
     const kind = parseKind(cell('kind'));
     if (!kind) problem(`Kind must be Habit or Quest, not “${cell('kind')}”.`);
 
-    if (!cell('room')) problem('Room is empty; every habit and quest belongs to a room.');
+    if (kind === 'habit' && !cell('room')) problem('a Habit needs a Room. (Only quests can have none.)');
+
+    // Quests say who can take them on; habits use Permanent Owner instead. Never mixed, never guessed.
+    const availableText = cell('availableTo');
+    const availableToNames: 'everyone' | string[] | undefined = /^everyone$/i.test(availableText)
+      ? 'everyone'
+      : availableText
+        ? availableText.split(/[;,]/).map((n) => n.trim()).filter(Boolean)
+        : undefined;
+    if (kind === 'quest' && !availableToNames) problem('a Quest needs Available To: “Everyone”, or member names separated by “;”.');
+    if (kind === 'quest' && cell('owner')) problem('Quests don’t have a Permanent Owner; use Available To instead.');
+    if (kind === 'habit' && availableText) problem('only Quests have Available To; habits use Permanent Owner.');
 
     const impact = parseImpact(cell('impact'));
     if (!impact) problem(`Ecological Impact must be Small, Medium or Large, not “${cell('impact')}”.`);
@@ -182,14 +202,14 @@ export function parseTendsCsv(text: string): ParseResult {
     if (description.length > DESCRIPTION_MAX) problem(`the description is longer than ${DESCRIPTION_MAX} characters.`);
 
     const key = `${cell('room')}|${rawName}`.toLowerCase();
-    if (seen.has(key)) problem(`it's listed twice in ${cell('room')}.`);
+    if (seen.has(key)) problem(`it's listed twice in ${cell('room') || 'quests with no room'}.`);
     seen.add(key);
 
     if (errors.length > before || !kind || !tier || !status || !impact) return;
 
     const common = {
       name: name(rawName),
-      roomName: room(cell('room')),
+      ...(cell('room') && { roomName: room(cell('room')) }),
       ...(cell('group') && { group: group(cell('group')) }),
       ...(description && { description }),
       tier,
@@ -197,9 +217,12 @@ export function parseTendsCsv(text: string): ParseResult {
       energy: parseEnergy(cell('energy')),
       status: status.status,
       ...(lastDone !== undefined && { lastDone }),
-      ...(cell('owner') && { ownerName: cell('owner') }),
     };
-    tends.push(kind === 'habit' ? { ...common, kind, frequencyDays: freq } : { ...common, kind, ...(status.done && { completed: true }) });
+    tends.push(
+      kind === 'habit'
+        ? { ...common, kind, frequencyDays: freq, ...(cell('owner') && { ownerName: cell('owner') }) }
+        : { ...common, kind, availableToNames: availableToNames!, ...(status.done && { completed: true }) },
+    );
   });
 
   return { tends: errors.length ? [] : tends, errors };
@@ -218,12 +241,13 @@ export function toTendsCsv(tends: Tend[], members: Member[], rooms: Room[]): str
   const memberName = new Map(members.map((m) => [m.id, m.name]));
   const roomName = new Map(rooms.map((r) => [r.id, r.name]));
   return Papa.unparse({
-    fields: ['Name', 'Room', 'Group', 'Kind', 'Ecological Impact', 'Description', 'Effort Tier', 'Energy Type', 'Frequency (Days)', 'Last Done Date', 'Permanent Owner', 'Status'],
+    fields: ['Name', 'Room', 'Group', 'Kind', 'Available To', 'Ecological Impact', 'Description', 'Effort Tier', 'Energy Type', 'Frequency (Days)', 'Last Done Date', 'Permanent Owner', 'Status'],
     data: tends.map((t) => [
       t.name,
-      roomName.get(t.roomId) ?? '',
+      (t.roomId && roomName.get(t.roomId)) ?? '',
       t.group ?? '',
       KIND_EXPORT[t.kind],
+      t.kind === 'quest' ? (t.availableTo === 'everyone' ? 'Everyone' : t.availableTo.map((id) => memberName.get(id) ?? '').join('; ')) : '',
       IMPACTS[t.impact].label,
       t.description ?? '',
       TIER_EXPORT[t.tier],

@@ -1007,3 +1007,34 @@ select {
 .room-admin-row .icon-btn:disabled {
   opacity: 0.35;
 }
+
+/* Demo */
+
+.demo-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 560px;
+  margin: 10px auto 0;
+  padding: 10px 12px 10px 16px;
+  border-radius: var(--radius);
+  background: var(--tier-sloth);
+  border: 1px solid var(--line);
+  font-size: 0.88rem;
+}
+
+.demo-banner span {
+  flex: 1;
+}
+
+.demo-banner .btn-soft {
+  flex: none;
+  min-height: 40px;
+  padding: 6px 14px;
+}
+
+@media (max-width: 600px) {
+  .demo-banner {
+    margin: 10px 16px 0;
+  }
+}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { setFrequency, updateTend, type CommonTendFields } from '../data/actions';
 import { DAY, dayKey, parseDay } from '../domain/dates';
-import { IMPACT_ORDER, IMPACTS, KINDS, STATUSES, TIER_ORDER, TIERS, type Tend, type TendStatus } from '../domain/types';
+import { IMPACT_ORDER, IMPACTS, KINDS, OUT_AND_ABOUT, STATUSES, TIER_ORDER, TIERS, type Tend, type TendStatus } from '../domain/types';
 import { useHabitat } from './habitat';
 
 type When = 'today' | 'yesterday' | 'twoDays' | 'pick';
@@ -157,7 +157,7 @@ export function TendSheet({ tend, defaultWho, onClose }: { tend: Tend; defaultWh
           <div>
             <h3 id="sheet-title">{live.name}</h3>
             <p className="muted small">
-              {KINDS[live.kind].emoji} {KINDS[live.kind].label} · {roomName(live.roomId)} · {IMPACTS[live.impact].emoji} {IMPACTS[live.impact].label} impact
+              {KINDS[live.kind].emoji} {KINDS[live.kind].label} · {live.roomId ? roomName(live.roomId) : OUT_AND_ABOUT.name} · {IMPACTS[live.impact].emoji} {IMPACTS[live.impact].label} impact
             </p>
           </div>
           <button className={`icon-btn${view === 'tweak' ? ' on' : ''}`} onClick={() => setView(view === 'log' ? 'tweak' : 'log')} aria-label={view === 'log' ? `Adjust this ${KINDS[live.kind].label.toLowerCase()}` : 'Back to logging'}>
