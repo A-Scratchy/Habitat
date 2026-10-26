@@ -1,0 +1,7 @@
+# Personal household data: kept local, never pushed
+Files/
+app specs.docx
+
+node_modules/
+dist/
+dev-dist/
