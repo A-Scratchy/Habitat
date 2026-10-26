@@ -147,7 +147,7 @@ main,
   inset: auto 0 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
@@ -606,6 +606,57 @@ main,
   font-size: 3rem;
 }
 
+.welcome .stack,
+.welcome form {
+  text-align: left;
+  margin-top: 8px;
+}
+
+.status-line {
+  margin: 14px auto 0;
+  padding: 8px 16px;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.status-line .link {
+  padding: 0;
+}
+
+/* A confirm question inside the status pill sits below it, full width. */
+.status-line .confirm {
+  margin-top: 8px;
+  text-align: left;
+}
+
+label.btn-done {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+label.btn-done.disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.code-input {
+  font-size: 1.3rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.waiting {
+  font-size: 1.1rem;
+}
+
 /* Forms */
 
 .field {
@@ -737,6 +788,21 @@ select {
   min-width: 0;
 }
 
+.profile-animal {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--sage-soft);
+  font-size: 1.8rem;
+}
+
+.sheet-head {
+  align-items: center;
+}
+
 .sheet input[type='date'] {
   margin-top: 8px;
   min-height: 44px;
@@ -744,6 +810,56 @@ select {
   border-radius: 12px;
   border: 1px solid var(--line);
   background: var(--surface);
+}
+
+.panel.error {
+  border-color: var(--danger);
+}
+
+.error-text {
+  color: var(--danger);
+}
+
+/* Chores: rooms fold so the master list is never one long wall */
+
+.room-group {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.room-group summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 52px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+.room-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.room-group summary::after {
+  content: '›';
+  margin-left: 10px;
+  color: var(--muted);
+  transition: transform 0.2s;
+}
+
+.room-group[open] summary::after {
+  transform: rotate(90deg);
+}
+
+.room-group summary .small {
+  margin-left: auto;
+}
+
+.room-group .admin-list {
+  padding: 0 10px 10px;
 }
 
 /* Toast */

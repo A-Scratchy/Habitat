@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Habitat.Api.Tests/Habitat.Api.Tests.csproj" />
+  <Project Path="Habitat.Api/Habitat.Api.csproj" />
+</Solution>

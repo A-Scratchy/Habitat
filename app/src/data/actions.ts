@@ -109,6 +109,15 @@ export async function importTasks(parsed: ParsedTask[], opts: ImportOptions): Pr
   });
 }
 
+/**
+ * Makes the signed-in person a member on this device, using their server id so it lines up when
+ * sync arrives, and selects them. Returns the member id to remember as "me".
+ */
+export async function adoptServerMember(me: { memberId: string; name: string; animal: string }): Promise<string> {
+  if (!(await db.members.get(me.memberId))) await db.members.put({ id: me.memberId, name: me.name, animal: me.animal });
+  return me.memberId;
+}
+
 export async function resetEverything(): Promise<void> {
   await db.transaction('rw', db.tasks, db.members, db.wins, async () => {
     await Promise.all([db.tasks.clear(), db.members.clear(), db.wins.clear()]);

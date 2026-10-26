@@ -5,3 +5,9 @@ app specs.docx
 node_modules/
 dist/
 dev-dist/
+
+# .NET build output
+bin/
+obj/
+*.user
+TestResults/

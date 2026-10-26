@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useLiveQuery } from 'dexie-react-hooks';
 import { completeTasks, undoWins } from '../data/actions';
 import { db } from '../data/db';
+import { readLocal, writeLocal } from '../data/local';
 import { DAY, startOfDay, startOfWeek } from '../domain/dates';
 import type { ViewContext } from '../domain/selection';
 import type { Member, Task, Win } from '../domain/types';
@@ -27,22 +28,7 @@ export function useHabitat(): Habitat {
   return h;
 }
 
-export function readLocal(key: string): string | undefined {
-  try {
-    return localStorage.getItem(key) ?? undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-export function writeLocal(key: string, value: string | undefined): void {
-  try {
-    if (value === undefined) localStorage.removeItem(key);
-    else localStorage.setItem(key, value);
-  } catch {
-    // Storage blocked: the setting just won't be remembered.
-  }
-}
+export { readLocal, writeLocal };
 
 /** Current time, refreshed every minute and whenever the app comes back into view. */
 function useNow(): number {
