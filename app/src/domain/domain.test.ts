@@ -4,7 +4,7 @@ import { DAY, dayKey, daysBetween, parseDay, startOfWeek } from './dates';
 import { parseTendsCsv, tidyText, toTendsCsv } from './csv';
 import { habitatHealth, packTotals, roomHealth } from './health';
 import { mockHistory } from './mock';
-import { browse, completedQuests, groupMates, isHandsOff, isOpen, lastDoneLabel, momentum, NO_ROOM, pickRandom, quickSet, quickWinsPool, weekSummary } from './selection';
+import { availableQuests, browse, completedQuests, groupMates, isHandsOff, isOpen, lastDoneLabel, momentum, NO_ROOM, pickRandom, quickQuest, quickSet, quickWinsPool, weekSummary } from './selection';
 import type { Habit, Quest, Win } from './types';
 import { needOf, needRatio } from './urgency';
 
@@ -73,11 +73,35 @@ describe('selection', () => {
     expect(quickSet([t1, t2, e1], ctx, 2).map((t) => t.id)).toEqual([t1.id, e1.id]);
   });
 
-  it('daily screens only offer habits, never quests', () => {
-    const q = quest({ tier: 'sloth' });
+  it('quick set is habits only; quests get their own "or try a quest" card', () => {
+    const q = quest({ name: 'B quest', tier: 'sloth' });
+    const q2 = quest({ name: 'A quest', tier: 'elephant' });
     const h = habit({ tier: 'sloth', frequencyDays: 1, lastDone: daysAgo(2) });
     expect(quickSet([q, h], ctx).map((t) => t.id)).toEqual([h.id]);
-    expect(quickWinsPool([q, h], ctx).map((t) => t.id)).toEqual([h.id]);
+    expect(quickQuest([q, q2, h], ctx)?.id).toBe(q2.id);
+    expect(quickQuest([q, q2, h], ctx, 1)?.id).toBe(q.id);
+    expect(quickQuest([q, q2, h], ctx, 2)?.id).toBe(q2.id);
+    expect(quickQuest([h], ctx)).toBeUndefined();
+  });
+
+  it('quest offers only include open quests available to you', () => {
+    const mine = quest({ name: 'Mine', availableTo: ['alex'] });
+    const robins = quest({ name: 'Robins', availableTo: ['robin'] });
+    const done = quest({ name: 'Done', completedAt: daysAgo(1) });
+    const paused = quest({ name: 'Paused', status: 'paused' });
+    const claimed = quest({ name: 'Claimed', claim: { memberId: 'robin', day: dayKey(NOW) } });
+    const all = [mine, robins, done, paused, claimed];
+    expect(availableQuests(all, ctx).map((t) => t.id)).toEqual([mine.id]);
+    expect(availableQuests(all, { ...ctx, memberId: 'robin' }).map((t) => t.id)).toEqual([robins.id, claimed.id]);
+  });
+
+  it('sloth mode offers easy habits and easy quests available to you', () => {
+    const h = habit({ tier: 'sloth', frequencyDays: 1, lastDone: daysAgo(2) });
+    const easy = quest({ tier: 'tortoise' });
+    const brainless = quest({ tier: 'elephant', energy: ['brainless'] });
+    const hard = quest({ tier: 'elephant' });
+    const notMine = quest({ tier: 'sloth', availableTo: ['robin'] });
+    expect(quickWinsPool([h, easy, brainless, hard, notMine], ctx).map((t) => t.id)).toEqual([h.id, easy.id, brainless.id]);
   });
 
   it('last done label', () => {

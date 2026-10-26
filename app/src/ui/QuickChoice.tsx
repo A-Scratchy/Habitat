@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { myClaims, quickSet } from '../domain/selection';
+import { myClaims, quickQuest, quickSet } from '../domain/selection';
 import { useHabitat } from './habitat';
 import { TendCard } from './TendCard';
 
@@ -8,6 +8,8 @@ export function QuickChoice() {
   const [round, setRound] = useState(0);
   const claims = myClaims(tends, ctx);
   const picks = quickSet(tends, ctx, round).filter((t) => !claims.includes(t));
+  const quest = quickQuest(tends, ctx, round);
+  const offer = quest && !claims.includes(quest) ? quest : undefined;
 
   return (
     <section className="screen">
@@ -30,16 +32,26 @@ export function QuickChoice() {
       {picks.length === 0 ? (
         <p className="empty">Nothing needs doing right now. Everything’s flourishing 🌳</p>
       ) : (
+        <div className="cards">
+          {picks.map((t) => (
+            <TendCard key={t.id} tend={t} />
+          ))}
+        </div>
+      )}
+
+      {offer && (
         <>
+          <h3 className="section-title">🗺️ Or try a quest</h3>
           <div className="cards">
-            {picks.map((t) => (
-              <TendCard key={t.id} tend={t} />
-            ))}
+            <TendCard key={offer.id} tend={offer} />
           </div>
-          <button className="btn-soft wide" onClick={() => setRound(round + 1)}>
-            Show me a different set 🔄
-          </button>
         </>
+      )}
+
+      {(picks.length > 0 || offer) && (
+        <button className="btn-soft wide" onClick={() => setRound(round + 1)}>
+          Show me a different set 🔄
+        </button>
       )}
     </section>
   );

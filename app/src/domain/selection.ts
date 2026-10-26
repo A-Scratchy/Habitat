@@ -1,5 +1,5 @@
 import { dayKey, daysBetween, HOUR, startOfWeek } from './dates';
-import { isCompleted, isHabit, OUT_AND_ABOUT, TIER_ORDER, type EffortTier, type EnergyTag, type Tend, type TendKind, type Win } from './types';
+import { isCompleted, isHabit, isQuest, OUT_AND_ABOUT, TIER_ORDER, type EffortTier, type EnergyTag, type Tend, type TendKind, type Win } from './types';
 import { needOf, needRatio } from './urgency';
 
 export interface ViewContext {
@@ -60,14 +60,26 @@ export function quickSet(tends: Tend[], ctx: ViewContext, round = 0): Tend[] {
   });
 }
 
-/** Low-effort candidates for Sloth & Tortoise mode. */
+/** Open quests the current member can take on, not claimed by someone else. */
+export function availableQuests(tends: Tend[], ctx: ViewContext): Tend[] {
+  return tends.filter((t) => isQuest(t) && isOpen(t) && isAvailableTo(t, ctx.memberId) && !isHandsOff(t, ctx));
+}
+
+/**
+ * The "or try a quest" card under Quick Choice: one available quest, alphabetical,
+ * stepped by `round` like the habit cards.
+ */
+export function quickQuest(tends: Tend[], ctx: ViewContext, round = 0): Tend | undefined {
+  const pool = availableQuests(tends, ctx).sort((a, b) => a.name.localeCompare(b.name));
+  return pool.length ? pool[round % pool.length] : undefined;
+}
+
+const isEasy = (t: Tend) => t.tier === 'sloth' || t.tier === 'tortoise' || t.energy.includes('micro') || t.energy.includes('brainless');
+
+/** Low-effort candidates for Sloth & Tortoise mode: easy habits that need doing, plus easy quests open to you. */
 export function quickWinsPool(tends: Tend[], ctx: ViewContext): Tend[] {
-  return dailyPool(tends, ctx).filter(
-    (t) =>
-      !isHandsOff(t, ctx) &&
-      needOf(t, ctx.now) !== 'resting' &&
-      (t.tier === 'sloth' || t.tier === 'tortoise' || t.energy.includes('micro') || t.energy.includes('brainless')),
-  );
+  const habits = dailyPool(tends, ctx).filter((t) => !isHandsOff(t, ctx) && needOf(t, ctx.now) !== 'resting' && isEasy(t));
+  return [...habits, ...availableQuests(tends, ctx).filter(isEasy)];
 }
 
 export function pickRandom<T extends { id: string }>(pool: T[], excludeId?: string, rnd = Math.random): T | undefined {
