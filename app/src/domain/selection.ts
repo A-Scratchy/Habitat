@@ -1,5 +1,5 @@
 import { dayKey, daysBetween, HOUR, startOfWeek } from './dates';
-import { TIER_ORDER, type EffortTier, type EnergyTag, type Task, type Win } from './types';
+import { isCompleted, isHabit, TIER_ORDER, type EffortTier, type EnergyTag, type Tend, type TendKind, type Win } from './types';
 import { needOf, needRatio } from './urgency';
 
 export interface ViewContext {
@@ -7,20 +7,20 @@ export interface ViewContext {
   memberId?: string;
 }
 
-export const doneToday = (t: Task, now: number) => t.lastDone != null && dayKey(t.lastDone) === dayKey(now);
+export const doneToday = (t: Tend, now: number) => t.lastDone != null && dayKey(t.lastDone) === dayKey(now);
 
-export const claimedToday = (t: Task, now: number) => !!t.claim && t.claim.day === dayKey(now);
+export const claimedToday = (t: Tend, now: number) => !!t.claim && t.claim.day === dayKey(now);
 
-export const isClaimedByOther = (t: Task, ctx: ViewContext) =>
+export const isClaimedByOther = (t: Tend, ctx: ViewContext) =>
   claimedToday(t, ctx.now) && t.claim!.memberId !== ctx.memberId;
 
-export const isOwnedByOther = (t: Task, ctx: ViewContext) => !!t.ownerId && t.ownerId !== ctx.memberId;
+export const isOwnedByOther = (t: Tend, ctx: ViewContext) => !!t.ownerId && t.ownerId !== ctx.memberId;
 
 /** Someone else's zone or someone else's job today: hide the Done button and keep it out of suggestions. */
-export const isHandsOff = (t: Task, ctx: ViewContext) => isOwnedByOther(t, ctx) || isClaimedByOther(t, ctx);
+export const isHandsOff = (t: Tend, ctx: ViewContext) => isOwnedByOther(t, ctx) || isClaimedByOther(t, ctx);
 
 /** "today", "yesterday", "5 days ago", or undefined if never logged. */
-export function lastDoneLabel(t: Task, now: number): string | undefined {
+export function lastDoneLabel(t: Tend, now: number): string | undefined {
   if (t.lastDone == null) return undefined;
   const d = daysBetween(t.lastDone, now);
   if (d <= 0) return 'today';
@@ -28,23 +28,26 @@ export function lastDoneLabel(t: Task, now: number): string | undefined {
   return `${d} days ago`;
 }
 
-/** Active routine tasks that haven't been done yet today. */
-export function dailyPool(tasks: Task[], ctx: ViewContext): Task[] {
-  return tasks.filter((t) => t.status === 'active' && !doneToday(t, ctx.now));
+/** Not paused, and (for quests) not finished: something that can be done now. */
+export const isOpen = (t: Tend) => t.status === 'active' && !isCompleted(t);
+
+/** Active habits that haven't been done yet today: the pool the daily screens choose from. */
+export function dailyPool(tends: Tend[], ctx: ViewContext): Tend[] {
+  return tends.filter((t) => isHabit(t) && isOpen(t) && !doneToday(t, ctx.now));
 }
 
-export function myClaims(tasks: Task[], ctx: ViewContext): Task[] {
-  return tasks.filter(
-    (t) => t.status !== 'paused' && !doneToday(t, ctx.now) && claimedToday(t, ctx.now) && t.claim!.memberId === ctx.memberId,
+export function myClaims(tends: Tend[], ctx: ViewContext): Tend[] {
+  return tends.filter(
+    (t) => isOpen(t) && !doneToday(t, ctx.now) && claimedToday(t, ctx.now) && t.claim!.memberId === ctx.memberId,
   );
 }
 
 /**
- * One task per effort tier, each the most-needed of its tier by schedule.
+ * One tend per effort tier, each the most-needed of its tier by schedule.
  * `round` steps each tier to its next candidate, wrapping, for "show me a different set".
  */
-export function quickSet(tasks: Task[], ctx: ViewContext, round = 0): Task[] {
-  const pool = dailyPool(tasks, ctx)
+export function quickSet(tends: Tend[], ctx: ViewContext, round = 0): Tend[] {
+  const pool = dailyPool(tends, ctx)
     .filter((t) => !isHandsOff(t, ctx) && needOf(t, ctx.now) !== 'resting' && needOf(t, ctx.now) !== 'unknown')
     .sort((a, b) => needRatio(b, ctx.now)! - needRatio(a, ctx.now)! || a.name.localeCompare(b.name));
   return TIER_ORDER.flatMap((tier) => {
@@ -54,8 +57,8 @@ export function quickSet(tasks: Task[], ctx: ViewContext, round = 0): Task[] {
 }
 
 /** Low-effort candidates for Sloth & Tortoise mode. */
-export function quickWinsPool(tasks: Task[], ctx: ViewContext): Task[] {
-  return dailyPool(tasks, ctx).filter(
+export function quickWinsPool(tends: Tend[], ctx: ViewContext): Tend[] {
+  return dailyPool(tends, ctx).filter(
     (t) =>
       !isHandsOff(t, ctx) &&
       needOf(t, ctx.now) !== 'resting' &&
@@ -68,9 +71,6 @@ export function pickRandom<T extends { id: string }>(pool: T[], excludeId?: stri
   return options[Math.floor(rnd() * options.length)];
 }
 
-/** Pseudo-room that lists every on-demand task, whatever room it belongs to. */
-export const ON_DEMAND = '__on-demand';
-
 export interface BrowseFilter {
   room?: string;
   query?: string;
@@ -78,22 +78,21 @@ export interface BrowseFilter {
   energy?: EnergyTag[];
 }
 
-export function matchesQuery(t: Task, query: string): boolean {
+export function matchesQuery(t: Tend, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return [t.name, t.room, t.group ?? ''].some((s) => s.toLowerCase().includes(q));
+  return [t.name, t.room, t.group ?? '', t.description ?? ''].some((s) => s.toLowerCase().includes(q));
 }
 
 /**
- * The master list, most urgent first. Nothing is hidden for being recently done, since some
- * jobs need doing again sooner than their schedule says. A room shows its active tasks; the
- * on-demand pseudo-room shows on-demand ones; a search with no room covers both.
+ * Open habits (Forage) or open quests (Quests), most urgent first. Nothing is hidden for being
+ * recently done, since some habits need doing again sooner than their schedule says. Paused tends
+ * and finished quests never show here (they live in the Tending tab and the Completed shelf).
  */
-export function browse(tasks: Task[], ctx: ViewContext, f: BrowseFilter): Task[] {
-  const rank = (t: Task) => needRatio(t, ctx.now) ?? -1;
-  const inScope = (t: Task) =>
-    f.room === ON_DEMAND ? t.status === 'onDemand' : f.room ? t.status === 'active' && t.room === f.room : t.status !== 'paused';
-  return tasks
+export function browse(tends: Tend[], ctx: ViewContext, kind: TendKind, f: BrowseFilter): Tend[] {
+  const rank = (t: Tend) => needRatio(t, ctx.now) ?? -1;
+  const inScope = (t: Tend) => isOpen(t) && t.kind === kind && (!f.room || t.room === f.room);
+  return tends
     .filter(
       (t) =>
         inScope(t) &&
@@ -104,15 +103,16 @@ export function browse(tasks: Task[], ctx: ViewContext, f: BrowseFilter): Task[]
     .sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name));
 }
 
-/** Other tasks that can be ticked off with "do all" alongside this one. */
-export function groupMates(tasks: Task[], task: Task, ctx: ViewContext): Task[] {
-  if (!task.group) return [];
-  const g = task.group.toLowerCase();
-  return tasks.filter(
+/** Other tends that can be ticked off with "do all" alongside this one. */
+export function groupMates(tends: Tend[], tend: Tend, ctx: ViewContext): Tend[] {
+  if (!tend.group) return [];
+  const g = tend.group.toLowerCase();
+  return tends.filter(
     (t) =>
-      t.id !== task.id &&
+      t.id !== tend.id &&
       t.group?.toLowerCase() === g &&
-      t.status === 'active' &&
+      isHabit(t) &&
+      isOpen(t) &&
       !doneToday(t, ctx.now) &&
       !isHandsOff(t, ctx),
   );
@@ -140,4 +140,9 @@ export function weekSummary(wins: Win[], now: number): WeekSummary {
     helpers: new Set(week.flatMap(winMembers)).size,
     rooms: [...rooms].sort((a, b) => b[1] - a[1]),
   };
+}
+
+/** The Completed shelf: finished quests, most recent first. */
+export function completedQuests(tends: Tend[]): Tend[] {
+  return tends.filter(isCompleted).sort((a, b) => b.completedAt! - a.completedAt!);
 }

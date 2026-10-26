@@ -61,11 +61,11 @@ public static class MemberEndpoints
         member.UpdatedAt = now;
         // Their login (if any) goes with them, and their zones and claims are freed up.
         db.Users.RemoveRange(await db.Users.Where(u => u.MemberId == id).ToListAsync());
-        foreach (var chore in await db.Chores.Where(c => c.OwnerMemberId == id || c.ClaimMemberId == id).ToListAsync())
+        foreach (var tend in await db.Tends.Where(c => c.OwnerMemberId == id || c.ClaimMemberId == id).ToListAsync())
         {
-            if (chore.OwnerMemberId == id) chore.OwnerMemberId = null;
-            if (chore.ClaimMemberId == id) (chore.ClaimMemberId, chore.ClaimDay) = (null, null);
-            chore.UpdatedAt = now;
+            if (tend.OwnerMemberId == id) tend.OwnerMemberId = null;
+            if (tend.ClaimMemberId == id) (tend.ClaimMemberId, tend.ClaimDay) = (null, null);
+            tend.UpdatedAt = now;
         }
         await db.SaveChangesAsync();
         return TypedResults.NoContent();

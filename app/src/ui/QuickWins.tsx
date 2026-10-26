@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { momentum, pickRandom, quickWinsPool } from '../domain/selection';
 import { useHabitat } from './habitat';
-import { TaskCard } from './TaskCard';
+import { TendCard } from './TendCard';
 
 const LEAVES = 6;
 
@@ -28,8 +28,8 @@ function Momentum({ count }: { count: number }) {
 }
 
 export function QuickWins() {
-  const { tasks, wins, ctx } = useHabitat();
-  const pool = quickWinsPool(tasks, ctx);
+  const { tends, wins, ctx } = useHabitat();
+  const pool = quickWinsPool(tends, ctx);
   const [pickId, setPickId] = useState<string>();
   const current = pool.find((t) => t.id === pickId);
 
@@ -50,7 +50,7 @@ export function QuickWins() {
 
       {shown ? (
         <>
-          <TaskCard key={shown.id} task={shown} big />
+          <TendCard key={shown.id} tend={shown} big />
           {pool.length > 1 && (
             <button className="btn-soft wide" onClick={() => setPickId(pickRandom(pool, shown.id)?.id)}>
               Show a different one 🔄

@@ -5,7 +5,7 @@ import { ApiError, CONNECTION_EVENT, forgetConnection, getMe, readConnection, sa
 import { db, selectHabitatDb } from './data/db';
 import { Browse } from './ui/Browse';
 import { BusyScreen } from './ui/Busy';
-import { Chores } from './ui/Chores';
+import { Tending } from './ui/Tending';
 import { HabitatProvider, useHabitat, writeLocal } from './ui/habitat';
 import { WhoIsHere } from './ui/Members';
 import { ProfileSheet } from './ui/Profile';
@@ -19,9 +19,10 @@ import { Welcome } from './ui/Welcome';
 const TABS = [
   { id: 'wins', icon: '🌊', label: 'Wins' },
   { id: 'quick', icon: '🍃', label: 'Quick' },
-  { id: 'sloth', icon: '🦥', label: 'Sloth mode' },
+  { id: 'sloth', icon: '🦥', label: 'Sloth' },
   { id: 'forage', icon: '🍄', label: 'Forage' },
-  { id: 'chores', icon: '📋', label: 'Chores' },
+  { id: 'quests', icon: '🗺️', label: 'Quests' },
+  { id: 'tending', icon: '🌱', label: 'Tending' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'] | 'settings';
@@ -65,8 +66,9 @@ function Main() {
         {tab === 'wins' && <WateringHole />}
         {tab === 'quick' && <QuickChoice />}
         {tab === 'sloth' && <QuickWins />}
-        {tab === 'forage' && <Browse />}
-        {tab === 'chores' && <Chores />}
+        {tab === 'forage' && <Browse key="habit" kind="habit" />}
+        {tab === 'quests' && <Browse key="quest" kind="quest" />}
+        {tab === 'tending' && <Tending />}
         {tab === 'settings' && <Settings key={settingsTab} initialTab={settingsTab} />}
       </main>
 

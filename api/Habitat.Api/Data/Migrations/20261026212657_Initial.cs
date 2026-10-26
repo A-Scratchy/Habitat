@@ -26,39 +26,6 @@ namespace Habitat.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Chores",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: false),
-                    Room = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
-                    Group = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: true),
-                    Tier = table.Column<string>(type: "nvarchar(16)", maxLength: 16, nullable: false),
-                    Energy = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    FrequencyDays = table.Column<int>(type: "int", nullable: true),
-                    Status = table.Column<string>(type: "nvarchar(16)", maxLength: 16, nullable: false),
-                    OwnerMemberId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    ClaimMemberId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    ClaimDay = table.Column<DateOnly>(type: "date", nullable: true),
-                    SeedLastDoneAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
-                    LastDoneAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
-                    DeletedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
-                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false),
-                    HouseholdId = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Chores", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Chores_Households_HouseholdId",
-                        column: x => x.HouseholdId,
-                        principalTable: "Households",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Devices",
                 columns: table => new
                 {
@@ -131,6 +98,43 @@ namespace Habitat.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Tends",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Kind = table.Column<string>(type: "nvarchar(8)", maxLength: 8, nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: false),
+                    Room = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
+                    Group = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: true),
+                    Description = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    Tier = table.Column<string>(type: "nvarchar(16)", maxLength: 16, nullable: false),
+                    Energy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    FrequencyDays = table.Column<int>(type: "int", nullable: true),
+                    Status = table.Column<string>(type: "nvarchar(16)", maxLength: 16, nullable: false),
+                    CompletedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    OwnerMemberId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    ClaimMemberId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    ClaimDay = table.Column<DateOnly>(type: "date", nullable: true),
+                    SeedLastDoneAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    LastDoneAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false),
+                    HouseholdId = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Tends", x => x.Id);
+                    table.CheckConstraint("CK_Tends_KindFields", "([Kind] = 'Habit' AND [FrequencyDays] IS NOT NULL AND [FrequencyDays] BETWEEN 1 AND 3650 AND [CompletedAt] IS NULL) OR ([Kind] = 'Quest' AND [FrequencyDays] IS NULL)");
+                    table.ForeignKey(
+                        name: "FK_Tends_Households_HouseholdId",
+                        column: x => x.HouseholdId,
+                        principalTable: "Households",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Users",
                 columns: table => new
                 {
@@ -159,12 +163,13 @@ namespace Habitat.Api.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    ChoreId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    ChoreName = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: false),
+                    TendId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    TendName = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: false),
                     Room = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
                     At = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     LoggedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     LoggedByDeviceId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    CompletedQuest = table.Column<bool>(type: "bit", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     DeletedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false),
@@ -201,16 +206,6 @@ namespace Habitat.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Chores_HouseholdId",
-                table: "Chores",
-                column: "HouseholdId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Chores_RowVersion",
-                table: "Chores",
-                column: "RowVersion");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Devices_HouseholdId",
                 table: "Devices",
                 column: "HouseholdId");
@@ -243,6 +238,16 @@ namespace Habitat.Api.Data.Migrations
                 column: "HouseholdId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Tends_HouseholdId",
+                table: "Tends",
+                column: "HouseholdId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Tends_RowVersion",
+                table: "Tends",
+                column: "RowVersion");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Users_HouseholdId",
                 table: "Users",
                 column: "HouseholdId");
@@ -264,11 +269,6 @@ namespace Habitat.Api.Data.Migrations
                 column: "MemberId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Wins_ChoreId_At",
-                table: "Wins",
-                columns: new[] { "ChoreId", "At" });
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Wins_HouseholdId",
                 table: "Wins",
                 column: "HouseholdId");
@@ -277,14 +277,16 @@ namespace Habitat.Api.Data.Migrations
                 name: "IX_Wins_RowVersion",
                 table: "Wins",
                 column: "RowVersion");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Wins_TendId_At",
+                table: "Wins",
+                columns: new[] { "TendId", "At" });
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "Chores");
-
             migrationBuilder.DropTable(
                 name: "Devices");
 
@@ -293,6 +295,9 @@ namespace Habitat.Api.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "PairingCodes");
+
+            migrationBuilder.DropTable(
+                name: "Tends");
 
             migrationBuilder.DropTable(
                 name: "Users");

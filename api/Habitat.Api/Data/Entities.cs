@@ -100,23 +100,39 @@ public enum EnergyTag
     Sensory,
 }
 
-public enum ChoreStatus
+/// <summary>Habits come back on a schedule; quests are one-offs that finish. Always stated, never derived.</summary>
+public enum TendKind
+{
+    Habit,
+    Quest,
+}
+
+public enum TendStatus
 {
     Active,
     Paused,
-    OnDemand,
 }
 
-/// <summary>Named Chore, not Task, to stay clear of System.Threading.Tasks.Task.</summary>
-public class Chore : HouseholdEntity, ISynced
+/// <summary>
+/// One thing that looks after the habitat. The Kind decides which of the kind-specific fields apply;
+/// a database CHECK constraint enforces it: a habit always has FrequencyDays and never CompletedAt,
+/// a quest never has FrequencyDays.
+/// </summary>
+public class Tend : HouseholdEntity, ISynced
 {
+    public TendKind Kind { get; set; }
     public required string Name { get; set; }
     public required string Room { get; set; }
     public string? Group { get; set; }
+    /// <summary>Notes or step-by-step instructions, one step per line.</summary>
+    public string? Description { get; set; }
     public EffortTier Tier { get; set; }
     public List<EnergyTag> Energy { get; set; } = [];
+    /// <summary>Habits only (required for them).</summary>
     public int? FrequencyDays { get; set; }
-    public ChoreStatus Status { get; set; }
+    public TendStatus Status { get; set; }
+    /// <summary>Quests only: when it was finished. Set means it's on the Completed shelf.</summary>
+    public DateTimeOffset? CompletedAt { get; set; }
     public Guid? OwnerMemberId { get; set; }
     public Guid? ClaimMemberId { get; set; }
     /// <summary>Household-local date the claim is for. A claim from another day has lapsed.</summary>
@@ -130,12 +146,12 @@ public class Chore : HouseholdEntity, ISynced
     public long RowVersion { get; set; }
 }
 
-/// <summary>Append-only record of a chore being done. Undo is a soft delete.</summary>
+/// <summary>Append-only record of a habit or quest being done. Undo is a soft delete.</summary>
 public class Win : HouseholdEntity, ISynced
 {
-    public Guid ChoreId { get; set; }
-    /// <summary>Snapshot, so the feed still reads right if the chore is renamed or removed.</summary>
-    public required string ChoreName { get; set; }
+    public Guid TendId { get; set; }
+    /// <summary>Snapshot, so the feed still reads right if it's renamed or removed.</summary>
+    public required string TendName { get; set; }
     public required string Room { get; set; }
     /// <summary>When it was done; may be backdated.</summary>
     public DateTimeOffset At { get; set; }
@@ -143,6 +159,8 @@ public class Win : HouseholdEntity, ISynced
     public DateTimeOffset LoggedAt { get; set; }
     public Guid LoggedByDeviceId { get; set; }
     public List<WinMember> Members { get; set; } = [];
+    /// <summary>True when this win finished a quest, so undoing it puts the quest back on the open list.</summary>
+    public bool CompletedQuest { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
     public long RowVersion { get; set; }
@@ -153,4 +171,10 @@ public class WinMember
 {
     public Guid MemberId { get; set; }
     public bool IsPrimary { get; set; }
+}
+
+public static class TendRules
+{
+    public const int DescriptionMax = 1000;
+    public const int MaxFrequencyDays = 3650;
 }

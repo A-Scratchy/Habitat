@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Habitat.Api.Features.Wins;
 
 /// <summary>MemberIds: everyone who did it, primary first. At: when it was done (may be backdated).</summary>
-public record WinInput(Guid ChoreId, Guid[] MemberIds, DateTimeOffset At);
+public record WinInput(Guid TendId, Guid[] MemberIds, DateTimeOffset At);
 
 public static class WinEndpoints
 {
@@ -19,8 +19,8 @@ public static class WinEndpoints
     public static void MapWinEndpoints(this IEndpointRouteBuilder api)
     {
         var wins = api.MapGroup("/wins").RequireAuthorization(HabitatPolicies.Device);
-        wins.MapPut("/{id:guid}", Put).WithSummary("Log a win. Safe to repeat: the same id is only ever logged once.");
-        wins.MapDelete("/{id:guid}", Delete).WithSummary("Undo a win. The chore's last-done date goes back to what it was.");
+        wins.MapPut("/{id:guid}", Put).WithSummary("Log a win. Safe to repeat: the same id is only ever logged once. Doing an open quest finishes it.");
+        wins.MapDelete("/{id:guid}", Delete).WithSummary("Undo a win. The last-done date goes back to what it was, and a quest it finished is reopened.");
     }
 
     private static async Task<IResult> Put(Guid id, WinInput input, ClaimsPrincipal principal, HabitatDb db, TimeProvider clock)
@@ -41,33 +41,38 @@ public static class WinEndpoints
         if (input.At < now - OldestBackdate) errors["at"] = ["Can't be more than a year ago."];
         if (errors.Count > 0) return TypedResults.ValidationProblem(errors);
 
-        var chore = await db.Chores.FirstOrDefaultAsync(c => c.Id == input.ChoreId && c.DeletedAt == null);
-        if (chore is null) return TypedResults.NotFound();
+        var tend = await db.Tends.FirstOrDefaultAsync(t => t.Id == input.TendId && t.DeletedAt == null);
+        if (tend is null) return TypedResults.NotFound();
+
+        // Doing an open quest finishes it: it moves to the Completed shelf.
+        var finishesQuest = tend.Kind == TendKind.Quest && tend.CompletedAt is null;
+        if (finishesQuest) tend.CompletedAt = input.At;
 
         db.Wins.Add(new Win
         {
             Id = id,
-            HouseholdId = chore.HouseholdId,
-            ChoreId = chore.Id,
-            ChoreName = chore.Name,
-            Room = chore.Room,
+            HouseholdId = tend.HouseholdId,
+            TendId = tend.Id,
+            TendName = tend.Name,
+            Room = tend.Room,
             At = input.At,
             LoggedAt = now,
             LoggedByDeviceId = principal.DeviceId(),
             Members = [.. memberIds.Select((m, i) => new WinMember { MemberId = m, IsPrimary = i == 0 })],
+            CompletedQuest = finishesQuest,
             UpdatedAt = now,
         });
 
-        // Only ever forward: a backdated win can't make a chore look more overdue than it is.
-        if (chore.LastDoneAt is null || input.At > chore.LastDoneAt) chore.LastDoneAt = input.At;
-        // Doing a claimed chore today fulfils the claim.
-        if (chore.ClaimDay is { } claimDay)
+        // Only ever forward: a backdated win can't make a habit look more overdue than it is.
+        if (tend.LastDoneAt is null || input.At > tend.LastDoneAt) tend.LastDoneAt = input.At;
+        // Doing a claimed tend today fulfils the claim.
+        if (tend.ClaimDay is { } claimDay)
         {
-            var zone = await db.TimeZoneOf(chore.HouseholdId);
+            var zone = await db.TimeZoneOf(tend.HouseholdId);
             if (claimDay == HouseholdTime.LocalDate(zone, now) && HouseholdTime.LocalDate(zone, input.At) == claimDay)
-                (chore.ClaimMemberId, chore.ClaimDay) = (null, null);
+                (tend.ClaimMemberId, tend.ClaimDay) = (null, null);
         }
-        chore.UpdatedAt = now;
+        tend.UpdatedAt = now;
 
         await db.SaveChangesAsync();
         return TypedResults.NoContent();
@@ -82,14 +87,17 @@ public static class WinEndpoints
         var now = clock.GetUtcNow();
         win.DeletedAt = win.UpdatedAt = now;
 
-        var chore = await db.Chores.FirstOrDefaultAsync(c => c.Id == win.ChoreId);
-        if (chore is not null)
+        var tend = await db.Tends.FirstOrDefaultAsync(t => t.Id == win.TendId);
+        if (tend is not null)
         {
+            // Undoing the win that finished a quest puts it back on the open list.
+            if (win.CompletedQuest && tend.CompletedAt == win.At) (tend.CompletedAt, tend.UpdatedAt) = (null, now);
+
             var latestWin = await db.Wins
-                .Where(w => w.ChoreId == chore.Id && w.Id != id && w.DeletedAt == null)
+                .Where(w => w.TendId == tend.Id && w.Id != id && w.DeletedAt == null)
                 .MaxAsync(w => (DateTimeOffset?)w.At);
-            var lastDone = new[] { chore.SeedLastDoneAt, latestWin }.Max();
-            if (lastDone != chore.LastDoneAt) (chore.LastDoneAt, chore.UpdatedAt) = (lastDone, now);
+            var lastDone = new[] { tend.SeedLastDoneAt, latestWin }.Max();
+            if (lastDone != tend.LastDoneAt) (tend.LastDoneAt, tend.UpdatedAt) = (lastDone, now);
         }
 
         await db.SaveChangesAsync();

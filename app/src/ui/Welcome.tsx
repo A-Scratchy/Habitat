@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { readConnection } from '../data/api';
-import { importTasks } from '../data/actions';
-import { parseChoresCsv } from '../domain/csv';
+import { importTends } from '../data/actions';
+import { parseTendsCsv } from '../domain/csv';
 import { SignInStatus } from './Busy';
 import { NewMemberForm } from './Members';
 import { useHabitat } from './habitat';
 
 export async function loadExample(): Promise<number> {
-  const text = await (await fetch(`${import.meta.env.BASE_URL}sample-chores.csv`)).text();
-  return importTasks(parseChoresCsv(text).tasks, { replace: true, mockDates: true });
+  const text = await (await fetch(`${import.meta.env.BASE_URL}sample-habitat.csv`)).text();
+  return importTends(parseTendsCsv(text).tends, { replace: true, mockDates: true });
 }
 
-/** First run of a habitat on this device: nobody and no chores here yet. */
+/** First run of a habitat on this device: nobody and no habits or quests here yet. */
 export function Welcome() {
   const { setMe } = useHabitat();
   const [busy, setBusy] = useState(false);
@@ -28,20 +28,20 @@ export function Welcome() {
       <SignInStatus />
       <p className="muted">
         {habitatName
-          ? 'Your habitat is ready on this device. Add some chores to get going; you can change them any time in the Chores tab.'
+          ? 'Your habitat is ready on this device. Add some habits and quests to get going; you can change them any time in the Tending tab.'
           : 'A calm place where the whole pack looks after home together. No one is assigned anything.'}
       </p>
       {error && <p className="panel error small">{error}</p>}
 
       {fresh ? (
         <>
-          <p>Start with yourself. Add chores in the Chores tab and the rest of the pack in Settings.</p>
+          <p>Start with yourself. Add habits and quests in the Tending tab, and the rest of the pack in Settings.</p>
           <NewMemberForm onSaved={setMe} />
         </>
       ) : (
         <div className="stack">
           <label className={`btn-done wide file${busy ? ' disabled' : ''}`}>
-            Import my chores (CSV) 📄
+            Import my habits and quests (CSV) 📄
             <input
               type="file"
               accept=".csv,text/csv"
@@ -51,10 +51,11 @@ export function Welcome() {
                 const file = e.target.files?.[0];
                 e.target.value = '';
                 if (!file) return;
-                const { tasks, warnings } = parseChoresCsv(await file.text());
-                if (tasks.length === 0) return setError(warnings[0] ?? 'No chores found in that file.');
+                const { tends, errors } = parseTendsCsv(await file.text());
+                if (errors.length) return setError(`Nothing was imported. ${errors.slice(0, 3).join(' ')}${errors.length > 3 ? ` (and ${errors.length - 3} more problems)` : ''}`);
+                if (tends.length === 0) return setError('There are no habits or quests in that file.');
                 setBusy(true);
-                await importTasks(tasks, { replace: true, mockDates: false });
+                await importTends(tends, { replace: true, mockDates: false });
               }}
             />
           </label>
@@ -68,9 +69,9 @@ export function Welcome() {
           >
             {busy ? 'Planting…' : 'Try the example household 🏡'}
           </button>
-          <p className="muted small">About 220 chores with pretend “last done” dates, so every screen has something to show.</p>
+          <p className="muted small">About 160 habits and 60 quests with pretend “last done” dates, so every screen has something to show.</p>
           <button className="btn-soft wide" disabled={busy} onClick={() => setFresh(true)}>
-            Start with no chores
+            Start with nothing yet
           </button>
         </div>
       )}

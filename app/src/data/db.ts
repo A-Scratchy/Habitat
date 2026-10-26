@@ -1,8 +1,8 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Member, Task, Win } from '../domain/types';
+import type { Member, Tend, Win } from '../domain/types';
 
 type HabitatDexie = Dexie & {
-  tasks: EntityTable<Task, 'id'>;
+  tends: EntityTable<Tend, 'id'>;
   members: EntityTable<Member, 'id'>;
   wins: EntityTable<Win, 'id'>;
 };
@@ -17,12 +17,22 @@ function open(name: string): HabitatDexie {
     members: 'id',
     wins: 'id, at',
   });
+  // Habits and quests replaced "tasks". Old rows didn't say which kind they were, so rather than
+  // guess they're dropped (nothing was launched); re-import with a Kind column. The pack stays.
+  d.version(2)
+    .stores({
+      tasks: null,
+      tends: 'id, kind, status, room',
+      members: 'id',
+      wins: 'id, at',
+    })
+    .upgrade((tx) => tx.table('wins').clear());
   return d;
 }
 
 /**
  * The local database for the habitat this device is in. Each habitat gets its own, so someone
- * else signing in on the same browser never sees another household's pack or chores.
+ * else signing in on the same browser never sees another household's pack, habits or quests.
  * A live binding: every module's `db` follows selectHabitatDb().
  */
 export let db: HabitatDexie = open(LOCAL_ONLY);

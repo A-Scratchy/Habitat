@@ -7,22 +7,24 @@ namespace Habitat.Api.Features.Sync;
 
 public record SyncMember(Guid Id, string Name, string Animal, bool IsUser, DateTimeOffset UpdatedAt, DateTimeOffset? DeletedAt);
 
-public record SyncChore(
-    Guid Id, string Name, string Room, string? Group, EffortTier Tier, EnergyTag[] Energy, int? FrequencyDays, ChoreStatus Status,
+/// <summary>FrequencyDays is set exactly when Kind is Habit; CompletedAt only ever for quests.</summary>
+public record SyncTend(
+    Guid Id, TendKind Kind, string Name, string Room, string? Group, string? Description, EffortTier Tier, EnergyTag[] Energy,
+    int? FrequencyDays, TendStatus Status, DateTimeOffset? CompletedAt,
     Guid? OwnerMemberId, Guid? ClaimMemberId, DateOnly? ClaimDay, DateTimeOffset? LastDoneAt, DateTimeOffset UpdatedAt, DateTimeOffset? DeletedAt);
 
 /// <summary>MemberIds: primary first.</summary>
-public record SyncWin(Guid Id, Guid ChoreId, string ChoreName, string Room, DateTimeOffset At, Guid[] MemberIds, DateTimeOffset? DeletedAt);
+public record SyncWin(Guid Id, Guid TendId, string TendName, string Room, DateTimeOffset At, Guid[] MemberIds, DateTimeOffset? DeletedAt);
 
 /// <summary>
 /// Cursor: pass back as <c>since</c> next time. It's a string because rowversions can outgrow JavaScript numbers.
 /// Full: true for a first sync (since=0), which skips removed rows and only includes recent wins.
 /// </summary>
-public record SyncResponse(string Cursor, bool Full, SyncMember[] Members, SyncChore[] Chores, SyncWin[] Wins);
+public record SyncResponse(string Cursor, bool Full, SyncMember[] Members, SyncTend[] Tends, SyncWin[] Wins);
 
 public static class SyncEndpoints
 {
-    /// <summary>A new device only needs recent wins: chores carry their own last-done dates.</summary>
+    /// <summary>A new device only needs recent wins: habits and quests carry their own last-done dates.</summary>
     public static readonly TimeSpan FirstSyncWinHistory = TimeSpan.FromDays(35);
 
     public static void MapSyncEndpoints(this IEndpointRouteBuilder api)
@@ -48,22 +50,23 @@ public static class SyncEndpoints
             .Select(m => new SyncMember(m.Id, m.Name, m.Animal, userMembers.Contains(m.Id), m.UpdatedAt, m.DeletedAt))
             .ToArrayAsync();
 
-        var chores = await db.Chores
-            .Where(c => c.RowVersion > from && c.RowVersion < upper && (!full || c.DeletedAt == null))
-            .Select(c => new SyncChore(
-                c.Id, c.Name, c.Room, c.Group, c.Tier, c.Energy.ToArray(), c.FrequencyDays, c.Status,
-                c.OwnerMemberId, c.ClaimMemberId, c.ClaimDay, c.LastDoneAt, c.UpdatedAt, c.DeletedAt))
+        var tends = await db.Tends
+            .Where(t => t.RowVersion > from && t.RowVersion < upper && (!full || t.DeletedAt == null))
+            .Select(t => new SyncTend(
+                t.Id, t.Kind, t.Name, t.Room, t.Group, t.Description, t.Tier, t.Energy.ToArray(),
+                t.FrequencyDays, t.Status, t.CompletedAt,
+                t.OwnerMemberId, t.ClaimMemberId, t.ClaimDay, t.LastDoneAt, t.UpdatedAt, t.DeletedAt))
             .ToArrayAsync();
 
         var wins = await db.Wins
             .Where(w => w.RowVersion > from && w.RowVersion < upper && (!full || (w.DeletedAt == null && w.At >= winsSince)))
             .Select(w => new SyncWin(
-                w.Id, w.ChoreId, w.ChoreName, w.Room, w.At,
+                w.Id, w.TendId, w.TendName, w.Room, w.At,
                 w.Members.OrderByDescending(m => m.IsPrimary).Select(m => m.MemberId).ToArray(),
                 w.DeletedAt))
             .ToArrayAsync();
 
         var cursor = Math.Max(from, upper - 1);
-        return TypedResults.Ok(new SyncResponse(cursor.ToString(), full, members, chores, wins));
+        return TypedResults.Ok(new SyncResponse(cursor.ToString(), full, members, tends, wins));
     }
 }

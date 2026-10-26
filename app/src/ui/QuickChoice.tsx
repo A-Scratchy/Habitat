@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { myClaims, quickSet } from '../domain/selection';
 import { useHabitat } from './habitat';
-import { TaskCard } from './TaskCard';
+import { TendCard } from './TendCard';
 
 export function QuickChoice() {
-  const { tasks, ctx } = useHabitat();
+  const { tends, ctx } = useHabitat();
   const [round, setRound] = useState(0);
-  const claims = myClaims(tasks, ctx);
-  const picks = quickSet(tasks, ctx, round).filter((t) => !claims.includes(t));
+  const claims = myClaims(tends, ctx);
+  const picks = quickSet(tends, ctx, round).filter((t) => !claims.includes(t));
 
   return (
     <section className="screen">
@@ -21,7 +21,7 @@ export function QuickChoice() {
           <h3 className="section-title">You said you’d do</h3>
           <div className="cards">
             {claims.map((t) => (
-              <TaskCard key={t.id} task={t} />
+              <TendCard key={t.id} tend={t} />
             ))}
           </div>
         </>
@@ -33,7 +33,7 @@ export function QuickChoice() {
         <>
           <div className="cards">
             {picks.map((t) => (
-              <TaskCard key={t.id} task={t} />
+              <TendCard key={t.id} tend={t} />
             ))}
           </div>
           <button className="btn-soft wide" onClick={() => setRound(round + 1)}>

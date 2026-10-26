@@ -147,7 +147,7 @@ main,
   inset: auto 0 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
@@ -820,7 +820,7 @@ select {
   color: var(--danger);
 }
 
-/* Chores: rooms fold so the master list is never one long wall */
+/* Tending: rooms fold so the master list is never one long wall */
 
 .room-group {
   border: 1px solid var(--line);
@@ -860,6 +860,20 @@ select {
 
 .room-group .admin-list {
   padding: 0 10px 10px;
+}
+
+.completed-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 4px;
+}
+
+.completed-row .btn-soft {
+  flex: none;
+  min-height: 38px;
+  padding: 6px 14px;
 }
 
 /* Toast */

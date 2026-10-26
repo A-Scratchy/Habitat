@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Habitat.Api.Data.Migrations
 {
     [DbContext(typeof(HabitatDb))]
-    [Migration("20261026174940_Initial")]
+    [Migration("20261026212657_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -24,82 +24,6 @@ namespace Habitat.Api.Data.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("Habitat.Api.Data.Chore", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateOnly?>("ClaimDay")
-                        .HasColumnType("date");
-
-                    b.Property<Guid?>("ClaimMemberId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset?>("DeletedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.PrimitiveCollection<string>("Energy")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("FrequencyDays")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Group")
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.Property<Guid>("HouseholdId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset?>("LastDoneAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<Guid?>("OwnerMemberId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Room")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
-                    b.Property<DateTimeOffset?>("SeedLastDoneAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)");
-
-                    b.Property<string>("Tier")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("HouseholdId");
-
-                    b.HasIndex("RowVersion");
-
-                    b.ToTable("Chores");
-                });
 
             modelBuilder.Entity("Habitat.Api.Data.Device", b =>
                 {
@@ -252,6 +176,97 @@ namespace Habitat.Api.Data.Migrations
                     b.ToTable("PairingCodes");
                 });
 
+            modelBuilder.Entity("Habitat.Api.Data.Tend", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("ClaimDay")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("ClaimMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.PrimitiveCollection<string>("Energy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("FrequencyDays")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Group")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<Guid>("HouseholdId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)");
+
+                    b.Property<DateTimeOffset?>("LastDoneAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<Guid?>("OwnerMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Room")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset?>("SeedLastDoneAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("Tier")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HouseholdId");
+
+                    b.HasIndex("RowVersion");
+
+                    b.ToTable("Tends", t =>
+                        {
+                            t.HasCheckConstraint("CK_Tends_KindFields", "([Kind] = 'Habit' AND [FrequencyDays] IS NOT NULL AND [FrequencyDays] BETWEEN 1 AND 3650 AND [CompletedAt] IS NULL) OR ([Kind] = 'Quest' AND [FrequencyDays] IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Habitat.Api.Data.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -305,13 +320,8 @@ namespace Habitat.Api.Data.Migrations
                     b.Property<DateTimeOffset>("At")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<Guid>("ChoreId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ChoreName")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
+                    b.Property<bool>("CompletedQuest")
+                        .HasColumnType("bit");
 
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("datetimeoffset");
@@ -336,6 +346,14 @@ namespace Habitat.Api.Data.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<Guid>("TendId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TendName")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -345,18 +363,9 @@ namespace Habitat.Api.Data.Migrations
 
                     b.HasIndex("RowVersion");
 
-                    b.HasIndex("ChoreId", "At");
+                    b.HasIndex("TendId", "At");
 
                     b.ToTable("Wins");
-                });
-
-            modelBuilder.Entity("Habitat.Api.Data.Chore", b =>
-                {
-                    b.HasOne("Habitat.Api.Data.Household", null)
-                        .WithMany()
-                        .HasForeignKey("HouseholdId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("Habitat.Api.Data.Device", b =>
@@ -378,6 +387,15 @@ namespace Habitat.Api.Data.Migrations
                 });
 
             modelBuilder.Entity("Habitat.Api.Data.PairingCode", b =>
+                {
+                    b.HasOne("Habitat.Api.Data.Household", null)
+                        .WithMany()
+                        .HasForeignKey("HouseholdId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Habitat.Api.Data.Tend", b =>
                 {
                     b.HasOne("Habitat.Api.Data.Household", null)
                         .WithMany()

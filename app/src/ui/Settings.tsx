@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { deleteMember, importTasks, resetEverything, saveMember } from '../data/actions';
-import { parseChoresCsv, toChoresCsv } from '../domain/csv';
+import { deleteMember, importTends, resetEverything, saveMember } from '../data/actions';
+import { parseTendsCsv, toTendsCsv } from '../domain/csv';
 import { dayKey } from '../domain/dates';
 import { AccountAdmin } from './Account';
 import { ConfirmButton, ConfirmPanel } from './Confirm';
@@ -64,30 +64,33 @@ function MembersAdmin() {
 }
 
 function DataAdmin() {
-  const { tasks, members } = useHabitat();
+  const { tends, members } = useHabitat();
   const [replace, setReplace] = useState(true);
   const [mockDates, setMockDates] = useState(true);
   const [report, setReport] = useState<string[]>();
-  /** A parsed file waiting for "yes, replace" before it overwrites the current tasks. */
-  const [pending, setPending] = useState<ReturnType<typeof parseChoresCsv>>();
+  /** A parsed file waiting for "yes, replace" before it overwrites the current tends. */
+  const [pending, setPending] = useState<ReturnType<typeof parseTendsCsv>>();
 
-  const runImport = async ({ tasks: parsed, warnings }: ReturnType<typeof parseChoresCsv>) => {
+  const runImport = async ({ tends: parsed }: ReturnType<typeof parseTendsCsv>) => {
     setPending(undefined);
-    const n = await importTasks(parsed, { replace, mockDates });
-    setReport([`Imported ${n} tasks.`, ...warnings]);
+    const n = await importTends(parsed, { replace, mockDates });
+    const quests = parsed.filter((t) => t.kind === 'quest').length;
+    setReport([`Imported ${n - quests} habits and ${quests} quests.`]);
   };
 
   const onFile = async (file: File) => {
-    const result = parseChoresCsv(await file.text());
+    const result = parseTendsCsv(await file.text());
     setReport(undefined);
-    if (result.tasks.length === 0) return setReport(result.warnings.length ? result.warnings : ['No tasks found in that file.']);
-    if (replace && tasks.length) return setPending(result);
+    // Strict: any problem means nothing is imported, and every problem is listed.
+    if (result.errors.length) return setReport(['Nothing was imported. Please fix these in the file and try again:', ...result.errors]);
+    if (result.tends.length === 0) return setReport(['There are no habits or quests in that file.']);
+    if (replace && tends.length) return setPending(result);
     await runImport(result);
   };
 
   const exportCsv = () => {
-    const url = URL.createObjectURL(new Blob([toChoresCsv(tasks, members)], { type: 'text/csv' }));
-    const a = Object.assign(document.createElement('a'), { href: url, download: `habitat-chores-${dayKey(Date.now())}.csv` });
+    const url = URL.createObjectURL(new Blob([toTendsCsv(tends, members)], { type: 'text/csv' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: `habitat-tending-${dayKey(Date.now())}.csv` });
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -95,10 +98,10 @@ function DataAdmin() {
   return (
     <div className="stack">
       <p className="muted small">
-        CSV columns: Chore Name, Room, Chore Group, Effort Tier, Energy Type, Frequency (Days), Last Done Date, Permanent Owner, Task status. Other columns are ignored.
+        CSV columns: Name, Room, Group, <strong>Kind</strong> (Habit or Quest, required), Description, Effort Tier, Energy Type, Frequency (Days: required for habits, blank for quests), Last Done Date, Permanent Owner, Status (Active, Paused, or Done for finished quests). Other columns are ignored.
       </p>
       <label className="check">
-        <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> Replace existing tasks
+        <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> Replace existing habits and quests
       </label>
       <label className="check">
         <input type="checkbox" checked={mockDates} onChange={(e) => setMockDates(e.target.checked)} /> Make up pretend “last done” dates (for trying things out)
@@ -119,7 +122,7 @@ function DataAdmin() {
       </label>
       {pending && (
         <ConfirmPanel
-          question={`Replace all ${tasks.length} tasks and this week’s wins with ${pending.tasks.length} from the file?`}
+          question={`Replace all ${tends.length} habits and quests, and this week’s wins, with ${pending.tends.length} from the file?`}
           confirmLabel="Yes, replace them"
           onConfirm={() => runImport(pending)}
           onCancel={() => setPending(undefined)}
@@ -127,19 +130,19 @@ function DataAdmin() {
       )}
       {report && (
         <ul className="report small">
-          {report.slice(0, 12).map((r, i) => (
+          {report.slice(0, 15).map((r, i) => (
             <li key={i}>{r}</li>
           ))}
-          {report.length > 12 && <li>…and {report.length - 12} more notes.</li>}
+          {report.length > 15 && <li>…and {report.length - 15} more.</li>}
         </ul>
       )}
       <button className="btn-soft" onClick={exportCsv}>
-        Export tasks as CSV
+        Export habits and quests as CSV
       </button>
-      <ConfirmButton question="Reload the example household? This replaces all tasks and wins." confirmLabel="Yes, reload it" onConfirm={loadExample}>
+      <ConfirmButton question="Reload the example household? This replaces all habits, quests and wins." confirmLabel="Yes, reload it" onConfirm={loadExample}>
         Reload example household
       </ConfirmButton>
-      <ConfirmButton className="link danger" question="Clear everything on this device: tasks, pack and wins?" confirmLabel="Yes, clear everything" onConfirm={resetEverything}>
+      <ConfirmButton className="link danger" question="Clear everything on this device: habits, quests, pack and wins?" confirmLabel="Yes, clear everything" onConfirm={resetEverything}>
         Clear everything
       </ConfirmButton>
     </div>

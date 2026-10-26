@@ -17,7 +17,7 @@ public class HabitatDb(DbContextOptions<HabitatDb> options, ICurrentHousehold? c
     public DbSet<User> Users => Set<User>();
     public DbSet<Device> Devices => Set<Device>();
     public DbSet<PairingCode> PairingCodes => Set<PairingCode>();
-    public DbSet<Chore> Chores => Set<Chore>();
+    public DbSet<Tend> Tends => Set<Tend>();
     public DbSet<Win> Wins => Set<Win>();
 
     /// <summary>Read by the query filters on every query, so it must stay a property of the context.</summary>
@@ -61,21 +61,28 @@ public class HabitatDb(DbContextOptions<HabitatDb> options, ICurrentHousehold? c
             e.HasIndex(x => x.CodeHash).IsUnique();
         });
 
-        b.Entity<Chore>(e =>
+        b.Entity<Tend>(e =>
         {
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(8);
             e.Property(x => x.Name).HasMaxLength(80);
             e.Property(x => x.Room).HasMaxLength(40);
             e.Property(x => x.Group).HasMaxLength(40);
+            e.Property(x => x.Description).HasMaxLength(TendRules.DescriptionMax);
             e.Property(x => x.Tier).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
             e.PrimitiveCollection(x => x.Energy).ElementType().HasConversion<string>();
+            // The habit/quest rules live in the database too, so no code path can store a half-and-half tend.
+            // "IS NOT NULL" is spelled out: SQL treats a CHECK that evaluates to unknown (NULL BETWEEN ...) as passing.
+            e.ToTable(t => t.HasCheckConstraint(
+                "CK_Tends_KindFields",
+                "([Kind] = 'Habit' AND [FrequencyDays] IS NOT NULL AND [FrequencyDays] BETWEEN 1 AND 3650 AND [CompletedAt] IS NULL) OR ([Kind] = 'Quest' AND [FrequencyDays] IS NULL)"));
         });
 
         b.Entity<Win>(e =>
         {
-            e.Property(x => x.ChoreName).HasMaxLength(80);
+            e.Property(x => x.TendName).HasMaxLength(80);
             e.Property(x => x.Room).HasMaxLength(40);
-            e.HasIndex(x => new { x.ChoreId, x.At });
+            e.HasIndex(x => new { x.TendId, x.At });
             e.OwnsMany(x => x.Members, m =>
             {
                 m.ToTable("WinMembers");

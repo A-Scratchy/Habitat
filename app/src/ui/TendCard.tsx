@@ -1,28 +1,29 @@
 import { useCallback, useState, type MouseEvent } from 'react';
 import { claimToday, releaseClaim } from '../data/actions';
 import { claimedToday, groupMates, isHandsOff, lastDoneLabel } from '../domain/selection';
-import { ENERGY, TIERS, type Task } from '../domain/types';
+import { ENERGY, KINDS, TIERS, type Tend } from '../domain/types';
 import { NEEDS, needOf } from '../domain/urgency';
 import { useHabitat } from './habitat';
-import { TaskSheet } from './TaskSheet';
+import { TendSheet } from './TendSheet';
 
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-export function TaskCard({ task, big = false }: { task: Task; big?: boolean }) {
-  const { tasks, ctx, me, memberById, complete } = useHabitat();
+export function TendCard({ tend, big = false }: { tend: Tend; big?: boolean }) {
+  const { tends, ctx, me, memberById, complete } = useHabitat();
   const [leaving, setLeaving] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const closeSheet = useCallback(() => setSheetOpen(false), []);
 
-  const owner = task.ownerId ? memberById.get(task.ownerId) : undefined;
-  const claimer = claimedToday(task, ctx.now) ? memberById.get(task.claim!.memberId) : undefined;
-  const handsOff = isHandsOff(task, ctx);
-  const mates = handsOff ? [] : groupMates(tasks, task, ctx);
-  const need = task.frequencyDays ? NEEDS[needOf(task, ctx.now)] : undefined;
-  const tier = TIERS[task.tier];
-  const last = lastDoneLabel(task, ctx.now);
+  const owner = tend.ownerId ? memberById.get(tend.ownerId) : undefined;
+  const claimer = claimedToday(tend, ctx.now) ? memberById.get(tend.claim!.memberId) : undefined;
+  const handsOff = isHandsOff(tend, ctx);
+  const mates = handsOff ? [] : groupMates(tends, tend, ctx);
+  // Only habits have a schedule, so only habits can be thirsty.
+  const need = tend.kind === 'habit' ? NEEDS[needOf(tend, ctx.now)] : undefined;
+  const tier = TIERS[tend.tier];
+  const last = lastDoneLabel(tend, ctx.now);
 
-  // Fade out, log, then fade back in: lists that keep done tasks (Forage) just re-sort it.
+  // Fade out, log, then fade back in: lists that keep done tends (Forage) just re-sort it.
   const finish = (ids: string[]) => {
     setLeaving(true);
     setTimeout(
@@ -48,50 +49,56 @@ export function TaskCard({ task, big = false }: { task: Task; big?: boolean }) {
   return (
     <>
       <article
-        className={`card tier-${task.tier}${big ? ' big' : ''}${leaving ? ' leaving' : ''}${handsOff ? ' hands-off' : ''}`}
+        className={`card tier-${tend.tier}${big ? ' big' : ''}${leaving ? ' leaving' : ''}${handsOff ? ' hands-off' : ''}`}
         onClick={openSheet}
       >
         <div className="card-top">
-          <h3>{task.name}</h3>
+          <h3>{tend.name}</h3>
           {need && (
             <span className="need" title={need.label}>
               {need.emoji} <span className="need-label">{need.label}</span>
             </span>
           )}
-          <button className="more" onClick={() => setSheetOpen(true)} aria-label={`More for ${task.name}`}>
+          <button className="more" onClick={() => setSheetOpen(true)} aria-label={`More for ${tend.name}`}>
             ⋯
           </button>
         </div>
         <p className="meta">
-          <span>{task.room}</span>
+          {tend.kind === 'quest' && <span className="tag">{KINDS.quest.emoji} Quest</span>}
+          <span>{tend.room}</span>
           <span className="tier-badge" title={tier.hint}>
             {tier.emoji} {tier.label}
           </span>
-          {task.energy.map((e) => (
+          {tend.energy.map((e) => (
             <span key={e} className="tag" title={ENERGY[e].hint}>
               {ENERGY[e].emoji} {ENERGY[e].label}
             </span>
           ))}
-          <span className="last">🕰️ {last ? `Done ${last}` : 'Not logged yet'}</span>
+          {(tend.kind === 'habit' || last) && <span className="last">🕰️ {last ? `Done ${last}` : 'Not logged yet'}</span>}
+          {tend.description && (
+            <span className="tag" title="Has instructions: tap the card to read them">
+              📝 How to
+            </span>
+          )}
         </p>
         {note && <p className="note">{note}</p>}
         {!handsOff && (
           <div className="actions">
-            <button className="btn-done" onClick={() => finish([task.id])} disabled={leaving}>
+            <button className="btn-done" onClick={() => finish([tend.id])} disabled={leaving}>
               Done! 🎉
             </button>
             {mates.length > 0 && (
-              <button className="btn-soft" onClick={() => finish([task.id, ...mates.map((m) => m.id)])} disabled={leaving}>
-                All {task.group} ({mates.length + 1}) 🚀
+              <button className="btn-soft" onClick={() => finish([tend.id, ...mates.map((m) => m.id)])} disabled={leaving}>
+                All {tend.group} ({mates.length + 1}) 🚀
               </button>
             )}
             {claimer ? (
-              <button className="link" onClick={() => void releaseClaim(task.id)}>
+              <button className="link" onClick={() => void releaseClaim(tend.id)}>
                 Let it go
               </button>
             ) : (
               me && (
-                <button className="link" onClick={() => void claimToday(task.id, me.id)}>
+                <button className="link" onClick={() => void claimToday(tend.id, me.id)}>
                   I’ll do this today
                 </button>
               )
@@ -99,7 +106,7 @@ export function TaskCard({ task, big = false }: { task: Task; big?: boolean }) {
           </div>
         )}
       </article>
-      {sheetOpen && <TaskSheet task={task} defaultWho={defaultWho} onClose={closeSheet} />}
+      {sheetOpen && <TendSheet tend={tend} defaultWho={defaultWho} onClose={closeSheet} />}
     </>
   );
 }

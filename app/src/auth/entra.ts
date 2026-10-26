@@ -52,7 +52,7 @@ export async function signIn(): Promise<void> {
 
 /**
  * Signs out and disconnects this device. While the sign-in is still valid it revokes this device's
- * token on the server, so a signed-out phone can't keep reading the habitat. Local chores stay.
+ * token on the server, so a signed-out phone can't keep reading the habitat. Local habits and quests stay.
  */
 export async function signOut(): Promise<void> {
   const connection = readConnection();

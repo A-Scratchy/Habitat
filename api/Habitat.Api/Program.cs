@@ -3,7 +3,7 @@ using System.Threading.RateLimiting;
 using Habitat.Api.Auth;
 using Habitat.Api.Data;
 using Habitat.Api.Features.Devices;
-using Habitat.Api.Features.Chores;
+using Habitat.Api.Features.Tends;
 using Habitat.Api.Features.Households;
 using Habitat.Api.Features.Members;
 using Habitat.Api.Features.Sync;
@@ -70,7 +70,7 @@ var api = app.MapGroup("/api");
 api.MapHouseholdEndpoints();
 api.MapDeviceEndpoints();
 api.MapMemberEndpoints();
-api.MapChoreEndpoints();
+api.MapTendEndpoints();
 api.MapWinEndpoints();
 api.MapSyncEndpoints();
 

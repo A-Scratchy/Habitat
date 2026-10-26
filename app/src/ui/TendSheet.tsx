@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { updateTask } from '../data/actions';
+import { setFrequency, updateTend, type CommonTendFields } from '../data/actions';
 import { DAY, dayKey, parseDay } from '../domain/dates';
-import { STATUSES, TIER_ORDER, TIERS, type Task, type TaskStatus } from '../domain/types';
+import { KINDS, STATUSES, TIER_ORDER, TIERS, type Tend, type TendStatus } from '../domain/types';
 import { useHabitat } from './habitat';
 
 type When = 'today' | 'yesterday' | 'twoDays' | 'pick';
 
 const FREQUENCIES = [1, 2, 3, 7, 14, 30, 60, 90, 365];
 
-function LogPanel({ task, defaultWho, onClose }: { task: Task; defaultWho: string[]; onClose(): void }) {
+function LogPanel({ tend, defaultWho, onClose }: { tend: Tend; defaultWho: string[]; onClose(): void }) {
   const { members, ctx, complete } = useHabitat();
   const [who, setWho] = useState(defaultWho);
   const [when, setWhen] = useState<When>('today');
@@ -61,7 +61,7 @@ function LogPanel({ task, defaultWho, onClose }: { task: Task; defaultWho: strin
         className="btn-done wide"
         disabled={who.length === 0}
         onClick={async () => {
-          await complete([task.id], { memberIds: who, at: at() });
+          await complete([tend.id], { memberIds: who, at: at() });
           onClose();
         }}
       >
@@ -71,27 +71,28 @@ function LogPanel({ task, defaultWho, onClose }: { task: Task; defaultWho: strin
   );
 }
 
-/** Quick tweaks to the master task; saved as you tap. */
-function TweakPanel({ task }: { task: Task }) {
-  const save = (patch: Partial<Task>) => void updateTask(task.id, patch);
+/** Quick tweaks to the master tend; saved as you tap. Everything else is in the Tending tab. */
+function TweakPanel({ tend }: { tend: Tend }) {
+  const save = (patch: Partial<CommonTendFields>) => void updateTend(tend.id, patch);
   return (
     <div className="stack">
       <fieldset className="field">
         <legend>Effort</legend>
         <div className="chips wrap">
           {TIER_ORDER.map((tier) => (
-            <button key={tier} type="button" className={`chip${task.tier === tier ? ' on' : ''}`} aria-pressed={task.tier === tier} onClick={() => save({ tier })}>
+            <button key={tier} type="button" className={`chip${tend.tier === tier ? ' on' : ''}`} aria-pressed={tend.tier === tier} onClick={() => save({ tier })}>
               {TIERS[tier].emoji} {TIERS[tier].label}
             </button>
           ))}
         </div>
       </fieldset>
 
+      {tend.kind === 'habit' && (
       <fieldset className="field">
         <legend>How often? Every … days</legend>
         <div className="chips wrap">
           {FREQUENCIES.map((n) => (
-            <button key={n} type="button" className={`chip${task.frequencyDays === n ? ' on' : ''}`} aria-pressed={task.frequencyDays === n} onClick={() => save({ frequencyDays: n })}>
+            <button key={n} type="button" className={`chip${tend.frequencyDays === n ? ' on' : ''}`} aria-pressed={tend.frequencyDays === n} onClick={() => void setFrequency(tend.id, n)}>
               {n}
             </button>
           ))}
@@ -99,36 +100,37 @@ function TweakPanel({ task }: { task: Task }) {
             className="chip-input"
             type="number"
             min={1}
-            key={task.frequencyDays}
-            defaultValue={FREQUENCIES.includes(task.frequencyDays ?? 0) ? '' : task.frequencyDays}
+            key={tend.frequencyDays}
+            defaultValue={FREQUENCIES.includes(tend.frequencyDays) ? '' : tend.frequencyDays}
             placeholder="Other"
             aria-label="Other number of days"
-            onBlur={(e) => +e.target.value >= 1 && save({ frequencyDays: Math.round(+e.target.value) })}
+            onBlur={(e) => +e.target.value >= 1 && void setFrequency(tend.id, Math.round(+e.target.value))}
           />
         </div>
       </fieldset>
+      )}
 
       <fieldset className="field">
         <legend>Status</legend>
         <div className="chips wrap">
-          {(Object.keys(STATUSES) as TaskStatus[]).map((s) => (
-            <button key={s} type="button" className={`chip${task.status === s ? ' on' : ''}`} aria-pressed={task.status === s} onClick={() => save({ status: s })}>
+          {(Object.keys(STATUSES) as TendStatus[]).map((s) => (
+            <button key={s} type="button" className={`chip${tend.status === s ? ' on' : ''}`} aria-pressed={tend.status === s} onClick={() => save({ status: s })}>
               {STATUSES[s]}
             </button>
           ))}
         </div>
       </fieldset>
-      <p className="muted small">Changes save straight away. Everything else is in Settings → Tasks.</p>
+      <p className="muted small">Changes save straight away. Everything else, including switching between habit and quest, is in the Tending tab.</p>
     </div>
   );
 }
 
-export function TaskSheet({ task, defaultWho, onClose }: { task: Task; defaultWho: string[]; onClose(): void }) {
-  const { tasks } = useHabitat();
+export function TendSheet({ tend, defaultWho, onClose }: { tend: Tend; defaultWho: string[]; onClose(): void }) {
+  const { tends } = useHabitat();
   const [view, setView] = useState<'log' | 'tweak'>('log');
   const sheet = useRef<HTMLDivElement>(null);
-  // Re-read the task so quick tweaks show immediately.
-  const live = tasks.find((t) => t.id === task.id) ?? task;
+  // Re-read the tend so quick tweaks show immediately.
+  const live = tends.find((t) => t.id === tend.id) ?? tend;
 
   useEffect(() => {
     sheet.current?.focus();
@@ -143,17 +145,39 @@ export function TaskSheet({ task, defaultWho, onClose }: { task: Task; defaultWh
         <header className="sheet-head">
           <div>
             <h3 id="sheet-title">{live.name}</h3>
-            <p className="muted small">{live.room}</p>
+            <p className="muted small">
+              {KINDS[live.kind].emoji} {KINDS[live.kind].label} · {live.room}
+            </p>
           </div>
-          <button className={`icon-btn${view === 'tweak' ? ' on' : ''}`} onClick={() => setView(view === 'log' ? 'tweak' : 'log')} aria-label={view === 'log' ? 'Adjust this task' : 'Back to logging'}>
+          <button className={`icon-btn${view === 'tweak' ? ' on' : ''}`} onClick={() => setView(view === 'log' ? 'tweak' : 'log')} aria-label={view === 'log' ? `Adjust this ${KINDS[live.kind].label.toLowerCase()}` : 'Back to logging'}>
             ⚙️
           </button>
           <button className="icon-btn" onClick={onClose} aria-label="Close">
             ✕
           </button>
         </header>
-        {view === 'log' ? <LogPanel task={live} defaultWho={defaultWho} onClose={onClose} /> : <TweakPanel task={live} />}
+        {view === 'log' && live.description && <Description text={live.description} />}
+        {view === 'log' ? <LogPanel tend={live} defaultWho={defaultWho} onClose={onClose} /> : <TweakPanel tend={live} />}
       </div>
+    </div>
+  );
+}
+
+/** Notes or instructions: several lines read as numbered steps, one line as a note. */
+export function Description({ text }: { text: string }) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  return (
+    <div className="panel description">
+      <p className="muted small">How to</p>
+      {lines.length > 1 ? (
+        <ol>
+          {lines.map((l, i) => (
+            <li key={i}>{l.replace(/^(\d+[.)]|[-*•])\s*/, '')}</li>
+          ))}
+        </ol>
+      ) : (
+        <p>{lines[0]}</p>
+      )}
     </div>
   );
 }

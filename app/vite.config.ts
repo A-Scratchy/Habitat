@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg', 'sample-chores.csv'],
+      includeAssets: ['icon.svg', 'sample-habitat.csv'],
       manifest: {
         name: 'Our Habitat',
         short_name: 'Habitat',

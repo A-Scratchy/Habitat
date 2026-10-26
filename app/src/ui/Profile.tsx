@@ -82,7 +82,7 @@ export function ProfileSheet({ onClose, onOpenAccountSettings }: { onClose(): vo
                   Signed in as <strong>{account.username}</strong>
                 </p>
                 <ConfirmButton
-                  question="Sign out and disconnect this device from the habitat? Chores already on it stay here."
+                  question="Sign out and disconnect this device from the habitat? Habits and quests already on it stay here."
                   confirmLabel="Yes, sign out"
                   onConfirm={signOut}
                 >

@@ -15,7 +15,7 @@ function WinRow({ win }: { win: Win }) {
       </span>
       <div>
         <p>
-          <strong>{who}</strong> looked after <strong>{win.taskName}</strong>
+          <strong>{who}</strong> looked after <strong>{win.tendName}</strong>
         </p>
         <p className="muted small">
           {win.room} · {timeOfDay(win.at)}

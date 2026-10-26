@@ -1,25 +1,29 @@
 import { dayKey } from '../domain/dates';
-import { type ParsedTask } from '../domain/csv';
+import { type ParsedTend } from '../domain/csv';
 import { mockHistory } from '../domain/mock';
-import { ANIMALS, type Member, type Task, type Win } from '../domain/types';
+import { ANIMALS, type DistributiveOmit, type Member, type Tend, type Win } from '../domain/types';
 import { db, newId } from './db';
 
 /**
- * Logs a win per task, credited to the first member with the rest tagged as helpers.
+ * Logs a win per tend, credited to the first member with the rest tagged as helpers.
  * `at` may be backdated ("forgot to tick it off"); lastDone only ever moves forward.
+ * Doing an open quest finishes it: it moves to the Completed shelf.
  * Returns the win ids so the toast can undo them.
  */
-export async function completeTasks(taskIds: string[], memberIds: string[], at = Date.now()): Promise<string[]> {
+export async function completeTends(tendIds: string[], memberIds: string[], at = Date.now()): Promise<string[]> {
   const [memberId, ...helperIds] = memberIds;
-  return db.transaction('rw', db.tasks, db.wins, async () => {
+  return db.transaction('rw', db.tends, db.wins, async () => {
     const ids: string[] = [];
-    for (const task of await db.tasks.bulkGet(taskIds)) {
-      if (!task) continue;
-      const win: Win = { id: newId(), taskId: task.id, taskName: task.name, room: task.room, memberId, at, prevLastDone: task.lastDone };
+    for (const tend of await db.tends.bulkGet(tendIds)) {
+      if (!tend) continue;
+      const finishesQuest = tend.kind === 'quest' && tend.completedAt == null;
+      const win: Win = { id: newId(), tendId: tend.id, tendName: tend.name, room: tend.room, memberId, at, prevLastDone: tend.lastDone };
       if (helperIds.length) win.helperIds = helperIds;
+      if (finishesQuest) win.completedQuest = true;
       await db.wins.add(win);
-      if (task.lastDone == null || at > task.lastDone) {
-        await db.tasks.update(task.id, { lastDone: at, ...(dayKey(at) === dayKey(Date.now()) && { claim: undefined }) });
+      if (finishesQuest) await db.tends.update(tend.id, { completedAt: at, claim: undefined });
+      if (tend.lastDone == null || at > tend.lastDone) {
+        await db.tends.update(tend.id, { lastDone: at, ...(dayKey(at) === dayKey(Date.now()) && { claim: undefined }) });
       }
       ids.push(win.id);
     }
@@ -28,35 +32,55 @@ export async function completeTasks(taskIds: string[], memberIds: string[], at =
 }
 
 export async function undoWins(winIds: string[]): Promise<void> {
-  await db.transaction('rw', db.tasks, db.wins, async () => {
+  await db.transaction('rw', db.tends, db.wins, async () => {
     for (const win of await db.wins.bulkGet(winIds)) {
       if (!win) continue;
-      const task = await db.tasks.get(win.taskId);
+      const tend = await db.tends.get(win.tendId);
       // Only roll back if nothing newer has been logged since.
-      if (task && task.lastDone === win.at) await db.tasks.update(task.id, { lastDone: win.prevLastDone });
+      if (tend && tend.lastDone === win.at) await db.tends.update(tend.id, { lastDone: win.prevLastDone });
+      // Undoing the win that finished a quest puts it back on the open list.
+      if (tend?.kind === 'quest' && win.completedQuest && tend.completedAt === win.at) await db.tends.update(tend.id, { completedAt: undefined });
       await db.wins.delete(win.id);
     }
   });
 }
 
-export async function claimToday(taskId: string, memberId: string): Promise<void> {
-  await db.tasks.update(taskId, { claim: { memberId, day: dayKey(Date.now()) } });
+export async function claimToday(tendId: string, memberId: string): Promise<void> {
+  await db.tends.update(tendId, { claim: { memberId, day: dayKey(Date.now()) } });
 }
 
-export async function updateTask(id: string, patch: Partial<Omit<Task, 'id'>>): Promise<void> {
-  await db.tasks.update(id, patch);
+/** Fields every tend has. Kind-specific changes go through saveTend, setFrequency or restartQuest. */
+export type CommonTendFields = Pick<Tend, 'name' | 'room' | 'group' | 'description' | 'tier' | 'energy' | 'status' | 'ownerId'>;
+
+export async function updateTend(id: string, patch: Partial<CommonTendFields>): Promise<void> {
+  await db.tends.update(id, patch);
 }
 
-export async function releaseClaim(taskId: string): Promise<void> {
-  await db.tasks.update(taskId, { claim: undefined });
+/** Habits only: how often it comes back. */
+export async function setFrequency(id: string, frequencyDays: number): Promise<void> {
+  const tend = await db.tends.get(id);
+  if (tend?.kind !== 'habit') throw new Error('Only habits have a frequency.');
+  await db.tends.update(id, { frequencyDays });
 }
 
-export async function saveTask(task: Omit<Task, 'id'> & { id?: string }): Promise<void> {
-  await db.tasks.put({ ...task, id: task.id ?? newId() });
+/** Takes a quest off the Completed shelf so it can be done again. */
+export async function restartQuest(id: string): Promise<void> {
+  const tend = await db.tends.get(id);
+  if (tend?.kind !== 'quest') throw new Error('Only quests can be restarted.');
+  await db.tends.update(id, { completedAt: undefined });
 }
 
-export async function deleteTask(id: string): Promise<void> {
-  await db.tasks.delete(id);
+export async function releaseClaim(tendId: string): Promise<void> {
+  await db.tends.update(tendId, { claim: undefined });
+}
+
+/** Creates or fully replaces a tend (the editor, including switching between habit and quest). */
+export async function saveTend(tend: DistributiveOmit<Tend, 'id'> & { id?: string }): Promise<void> {
+  await db.tends.put({ ...tend, id: tend.id ?? newId() } as Tend);
+}
+
+export async function deleteTend(id: string): Promise<void> {
+  await db.tends.delete(id);
 }
 
 export async function saveMember(member: Omit<Member, 'id'> & { id?: string }): Promise<string> {
@@ -66,9 +90,9 @@ export async function saveMember(member: Omit<Member, 'id'> & { id?: string }): 
 }
 
 export async function deleteMember(id: string): Promise<void> {
-  await db.transaction('rw', db.members, db.tasks, async () => {
+  await db.transaction('rw', db.members, db.tends, async () => {
     await db.members.delete(id);
-    await db.tasks.filter((t) => t.ownerId === id).modify((t) => void delete t.ownerId);
+    await db.tends.filter((t) => t.ownerId === id).modify((t) => void delete t.ownerId);
   });
 }
 
@@ -78,10 +102,10 @@ export interface ImportOptions {
 }
 
 /** Imports parsed rows, creating members for any owners named in the file. */
-export async function importTasks(parsed: ParsedTask[], opts: ImportOptions): Promise<number> {
-  return db.transaction('rw', db.tasks, db.members, db.wins, async () => {
+export async function importTends(parsed: ParsedTend[], opts: ImportOptions): Promise<number> {
+  return db.transaction('rw', db.tends, db.members, db.wins, async () => {
     if (opts.replace) {
-      await db.tasks.clear();
+      await db.tends.clear();
       await db.wins.clear();
     }
     const members = await db.members.toArray();
@@ -94,18 +118,20 @@ export async function importTasks(parsed: ParsedTask[], opts: ImportOptions): Pr
       await db.members.add(m);
     }
 
-    let tasks: Task[] = parsed.map(({ ownerName, ...rest }) => ({
-      ...rest,
-      id: newId(),
-      ownerId: ownerName ? byName.get(ownerName.toLowerCase())?.id : undefined,
-    }));
+    const now = Date.now();
+    let tends: Tend[] = parsed.map(({ ownerName, completed, ...rest }) => {
+      const ownerId = ownerName ? byName.get(ownerName.toLowerCase())?.id : undefined;
+      return rest.kind === 'quest'
+        ? { ...rest, id: newId(), ownerId, ...(completed && { completedAt: rest.lastDone ?? now }) }
+        : { ...rest, id: newId(), ownerId };
+    });
     if (opts.mockDates) {
-      const mocked = mockHistory(tasks, members, Date.now(), newId);
-      tasks = mocked.tasks;
+      const mocked = mockHistory(tends, members, Date.now(), newId);
+      tends = mocked.tends;
       await db.wins.bulkAdd(mocked.wins);
     }
-    await db.tasks.bulkAdd(tasks);
-    return tasks.length;
+    await db.tends.bulkAdd(tends);
+    return tends.length;
   });
 }
 
@@ -119,7 +145,7 @@ export async function adoptServerMember(me: { memberId: string; name: string; an
 }
 
 export async function resetEverything(): Promise<void> {
-  await db.transaction('rw', db.tasks, db.members, db.wins, async () => {
-    await Promise.all([db.tasks.clear(), db.members.clear(), db.wins.clear()]);
+  await db.transaction('rw', db.tends, db.members, db.wins, async () => {
+    await Promise.all([db.tends.clear(), db.members.clear(), db.wins.clear()]);
   });
 }

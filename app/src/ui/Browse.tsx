@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { browse, ON_DEMAND } from '../domain/selection';
-import { ENERGY, ENERGY_ORDER, TIER_ORDER, TIERS, type EffortTier, type EnergyTag } from '../domain/types';
+import { restartQuest } from '../data/actions';
+import { browse, completedQuests, pickRandom } from '../domain/selection';
+import { ENERGY, ENERGY_ORDER, KINDS, TIER_ORDER, TIERS, type EffortTier, type EnergyTag, type TendKind } from '../domain/types';
 import { needOf } from '../domain/urgency';
 import { useHabitat } from './habitat';
-import { TaskCard } from './TaskCard';
+import { TendCard } from './TendCard';
 
 const ROOM_EMOJI: [RegExp, string][] = [
   [/kitchen/i, '🍳'],
@@ -16,38 +17,70 @@ const ROOM_EMOJI: [RegExp, string][] = [
   [/dining/i, '🍽️'],
   [/general|house/i, '🏡'],
 ];
-const roomEmoji = (room: string) => (room === ON_DEMAND ? '🃏' : (ROOM_EMOJI.find(([re]) => re.test(room))?.[1] ?? '🏠'));
-const roomName = (room: string) => (room === ON_DEMAND ? 'On demand' : room);
+const roomEmoji = (room: string) => ROOM_EMOJI.find(([re]) => re.test(room))?.[1] ?? '🏠';
 
 const toggle = <T,>(list: T[], item: T) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
 
-export function Browse() {
-  const { tasks, ctx } = useHabitat();
+const COPY: Record<TendKind, { title: string; blurb: string; empty: string }> = {
+  habit: {
+    title: 'Foraging Menu',
+    blurb: 'Every habit, most needed first. Choose how you’d like to help.',
+    empty: 'No habits match that 🌳',
+  },
+  quest: {
+    title: 'Quests',
+    blurb: 'One-off adventures for when you fancy something different. Done quests go to the Completed shelf.',
+    empty: 'No quests match that 🗺️',
+  },
+};
+
+/** Room-by-room browsing of open habits (Forage) or open quests (Quests). */
+export function Browse({ kind }: { kind: TendKind }) {
+  const { tends, ctx } = useHabitat();
   const [room, setRoom] = useState<string>();
   const [query, setQuery] = useState('');
   const [tiers, setTiers] = useState<EffortTier[]>([]);
   const [energy, setEnergy] = useState<EnergyTag[]>([]);
+  const [surpriseId, setSurpriseId] = useState<string>();
+  const copy = COPY[kind];
 
   const filter = { query, tiers, energy };
-  const rooms = [...new Set(tasks.filter((t) => t.status === 'active').map((t) => t.room))].sort((a, b) => a.localeCompare(b));
-  if (tasks.some((t) => t.status === 'onDemand')) rooms.push(ON_DEMAND);
+  const everything = browse(tends, ctx, kind, filter);
+  const rooms = [...new Set(everything.map((t) => t.room))].sort((a, b) => a.localeCompare(b));
   const choosingRoom = !room && !query.trim();
-  const results = choosingRoom ? [] : browse(tasks, ctx, { ...filter, room });
+  const results = choosingRoom ? [] : browse(tends, ctx, kind, { ...filter, room });
+  const surprise = everything.find((t) => t.id === surpriseId);
 
   return (
     <section className="screen">
       <header className="screen-head">
-        <h2>Foraging Menu</h2>
-        <p className="muted">Everything on the master list, most needed first. Choose how you’d like to help.</p>
+        <h2>{copy.title}</h2>
+        <p className="muted">{copy.blurb}</p>
       </header>
+
+      {kind === 'quest' && (
+        <>
+          <button className="btn-done" disabled={everything.length === 0} onClick={() => setSurpriseId(pickRandom(everything, surpriseId)?.id)}>
+            🎲 Pick a quest for me
+          </button>
+          {surprise && (
+            <>
+              <TendCard key={surprise.id} tend={surprise} big />
+              <button className="link center" onClick={() => setSurpriseId(undefined)}>
+                Put it back
+              </button>
+            </>
+          )}
+        </>
+      )}
 
       <input
         className="search"
         type="search"
-        placeholder="Search, e.g. “sink” or “feed”"
+        placeholder={kind === 'habit' ? 'Search, e.g. “sink” or “feed”' : 'Search, e.g. “tip” or “shop”'}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        aria-label="Search tasks"
+        aria-label={`Search ${KINDS[kind].plural.toLowerCase()}`}
       />
 
       <div className="chips" role="group" aria-label="Effort and energy filters">
@@ -66,24 +99,27 @@ export function Browse() {
       {choosingRoom ? (
         <>
           <h3 className="section-title">Where are you?</h3>
+          {rooms.length === 0 && <p className="empty">{kind === 'habit' ? 'No habits yet. Add some in the Tending tab.' : 'No open quests. Add one in the Tending tab.'}</p>}
           <div className="rooms">
             {rooms.map((r) => {
-              const here = browse(tasks, ctx, { ...filter, room: r });
+              const here = everything.filter((t) => t.room === r);
               const thirsty = here.filter((t) => ['thirsty', 'wilting'].includes(needOf(t, ctx.now))).length;
+              const noun = here.length === 1 ? KINDS[kind].label.toLowerCase() : KINDS[kind].plural.toLowerCase();
               return (
                 <button key={r} className="room-tile" onClick={() => setRoom(r)}>
                   <span className="room-emoji" aria-hidden>
                     {roomEmoji(r)}
                   </span>
-                  <span className="room-name">{roomName(r)}</span>
+                  <span className="room-name">{r}</span>
                   <span className="muted small">
-                    {here.length} {here.length === 1 ? 'task' : 'tasks'}
+                    {here.length} {noun}
                     {thirsty > 0 ? ` · ${thirsty} 💧` : ''}
                   </span>
                 </button>
               );
             })}
           </div>
+          {kind === 'quest' && <CompletedShelf />}
         </>
       ) : (
         <>
@@ -93,21 +129,49 @@ export function Browse() {
             </button>
             {room && (
               <span className="here">
-                {roomEmoji(room)} {roomName(room)}
+                {roomEmoji(room)} {room}
               </span>
             )}
           </div>
           {results.length === 0 ? (
-            <p className="empty">No tasks match that 🌳</p>
+            <p className="empty">{copy.empty}</p>
           ) : (
             <div className="cards">
               {results.map((t) => (
-                <TaskCard key={t.id} task={t} />
+                <TendCard key={t.id} tend={t} />
               ))}
             </div>
           )}
         </>
       )}
     </section>
+  );
+}
+
+/** Finished quests, kept like trophies. Restart puts one back on the open list. */
+function CompletedShelf() {
+  const { tends } = useHabitat();
+  const done = completedQuests(tends);
+  if (done.length === 0) return null;
+  return (
+    <details className="room-group">
+      <summary>
+        <span>🏆 Completed</span>
+        <span className="muted small">{done.length}</span>
+      </summary>
+      <ul className="admin-list">
+        {done.map((q) => (
+          <li key={q.id} className="completed-row">
+            <span>
+              {q.name}
+              <span className="muted small"> · {q.room} · {new Date(q.completedAt!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+            </span>
+            <button className="btn-soft" onClick={() => void restartQuest(q.id)}>
+              Restart
+            </button>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

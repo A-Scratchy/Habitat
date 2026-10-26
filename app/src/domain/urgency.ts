@@ -1,5 +1,5 @@
 import { daysBetween } from './dates';
-import type { Task } from './types';
+import type { Tend } from './types';
 
 export type Need = 'unknown' | 'resting' | 'soon' | 'thirsty' | 'wilting';
 
@@ -13,15 +13,15 @@ export const NEEDS: Record<Need, { emoji: string; label: string }> = {
 
 /**
  * Days since done ÷ frequency. 1 means due today; 2 means a whole extra cycle has passed.
- * Undefined when there is no schedule or the task has never been logged.
+ * Undefined when there is no schedule or the tend has never been logged.
  */
-export function needRatio(task: Task, now: number): number | undefined {
-  if (!task.frequencyDays || task.lastDone == null) return undefined;
-  return daysBetween(task.lastDone, now) / task.frequencyDays;
+export function needRatio(tend: Tend, now: number): number | undefined {
+  if (!tend.frequencyDays || tend.lastDone == null) return undefined;
+  return daysBetween(tend.lastDone, now) / tend.frequencyDays;
 }
 
-export function needOf(task: Task, now: number): Need {
-  const r = needRatio(task, now);
+export function needOf(tend: Tend, now: number): Need {
+  const r = needRatio(tend, now);
   if (r === undefined) return 'unknown';
   if (r < 0.6) return 'resting';
   if (r < 1) return 'soon';

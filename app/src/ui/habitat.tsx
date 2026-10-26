@@ -1,14 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { completeTasks, undoWins } from '../data/actions';
+import { completeTends, undoWins } from '../data/actions';
 import { db } from '../data/db';
 import { readLocal, writeLocal } from '../data/local';
 import { DAY, startOfDay, startOfWeek } from '../domain/dates';
 import type { ViewContext } from '../domain/selection';
-import type { Member, Task, Win } from '../domain/types';
+import type { Member, Tend, Win } from '../domain/types';
 
 export interface Habitat {
-  tasks: Task[];
+  tends: Tend[];
   members: Member[];
   /** Wins since the start of this week (and at least since yesterday). */
   wins: Win[];
@@ -17,7 +17,7 @@ export interface Habitat {
   memberById: Map<string, Member>;
   setMe(id: string | undefined): void;
   /** Defaults to "me, just now". */
-  complete(taskIds: string[], opts?: { memberIds?: string[]; at?: number }): Promise<void>;
+  complete(tendIds: string[], opts?: { memberIds?: string[]; at?: number }): Promise<void>;
 }
 
 const HabitatContext = createContext<Habitat | null>(null);
@@ -45,7 +45,7 @@ function useNow(): number {
   return now;
 }
 
-const CHEERS = ['Habitat nurtured! 🌿', 'Task smashed! ✨', 'The ecosystem thanks you 🐝', 'Lovely work 🌸', 'Another leaf on the tree 🍃', 'Nicely done 🦔'];
+const CHEERS = ['Habitat nurtured! 🌿', 'Nicely tended! ✨', 'The ecosystem thanks you 🐝', 'Lovely work 🌸', 'Another leaf on the tree 🍃', 'Nicely done 🦔'];
 
 interface Toast {
   message: string;
@@ -55,7 +55,7 @@ interface Toast {
 export function HabitatProvider({ children, loading }: { children: (state: 'loading' | 'empty' | 'ready') => ReactNode; loading?: ReactNode }) {
   const now = useNow();
   const since = Math.min(startOfWeek(now), startOfDay(now) - DAY);
-  const tasks = useLiveQuery(() => db.tasks.toArray(), []);
+  const tends = useLiveQuery(() => db.tends.toArray(), []);
   const members = useLiveQuery(() => db.members.toArray(), []);
   const wins = useLiveQuery(() => db.wins.where('at').aboveOrEqual(since).toArray(), [since]);
   const [meId, setMeId] = useState(() => readLocal('eco.member'));
@@ -74,31 +74,34 @@ export function HabitatProvider({ children, loading }: { children: (state: 'load
   }, []);
 
   const complete = useCallback(
-    async (taskIds: string[], opts: { memberIds?: string[]; at?: number } = {}) => {
+    async (tendIds: string[], opts: { memberIds?: string[]; at?: number } = {}) => {
       const memberIds = opts.memberIds ?? (meId ? [meId] : []);
       if (!memberIds.length) return;
-      const winIds = await completeTasks(taskIds, memberIds, opts.at);
+      const winIds = await completeTends(tendIds, memberIds, opts.at);
       const others = memberIds.filter((id) => id !== meId).map((id) => members?.find((m) => m.id === id)?.name);
+      const quest = tendIds.length === 1 && tends?.find((x) => x.id === tendIds[0])?.kind === 'quest';
       const message =
-        winIds.length > 1
+        quest
+          ? 'Quest complete! 🏆 It’s on the Completed shelf.'
+          : winIds.length > 1
           ? `${winIds.length} done in one sweep! 🚀`
           : others.length
             ? `Logged, thank you ${others.join(' & ')} ✨`
             : CHEERS[Math.floor(Math.random() * CHEERS.length)];
       showToast({ message, winIds });
     },
-    [meId, members, showToast],
+    [meId, members, tends, showToast],
   );
 
   const value = useMemo<Habitat | null>(() => {
-    if (!tasks || !members || !wins) return null;
+    if (!tends || !members || !wins) return null;
     const memberById = new Map(members.map((m) => [m.id, m]));
     const me = meId ? memberById.get(meId) : undefined;
-    return { tasks, members, wins, me, ctx: { now, memberId: me?.id }, memberById, setMe, complete };
-  }, [tasks, members, wins, meId, now, setMe, complete]);
+    return { tends, members, wins, me, ctx: { now, memberId: me?.id }, memberById, setMe, complete };
+  }, [tends, members, wins, meId, now, setMe, complete]);
 
   if (!value) return <>{loading}</>;
-  const state = value.tasks.length === 0 && value.members.length === 0 ? 'empty' : 'ready';
+  const state = value.tends.length === 0 && value.members.length === 0 ? 'empty' : 'ready';
   return (
     <HabitatContext.Provider value={value}>
       {children(state)}

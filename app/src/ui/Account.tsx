@@ -3,7 +3,7 @@ import { entraConfigured, signedInAccount, signIn } from '../auth/entra';
 import { forgetConnection, getMe, readConnection, type MeResponse } from '../data/api';
 import { ConfirmButton } from './Confirm';
 
-/** This device's place in the habitat. Chores still live only on this device until sync lands. */
+/** This device's place in the habitat. Habits and quests still live only on this device until sync lands. */
 export function AccountAdmin() {
   const [connection] = useState(readConnection);
   const account = signedInAccount();
@@ -21,7 +21,7 @@ export function AccountAdmin() {
           In <strong>{connection.householdName ?? 'your habitat'}</strong> 🌿
         </p>
         <p className="muted small">{account ? `Signed in as ${account.username}` : 'This device joined with a code; nobody is signed in on it.'}</p>
-        <p className="muted small">Sharing chores and wins between devices comes next. For now they still live on this device.</p>
+        <p className="muted small">Sharing habits, quests and wins between devices comes next. For now they still live on this device.</p>
       </div>
       {!account && (
         <button className="btn-soft" onClick={() => void signIn()}>
