@@ -1,0 +1,34 @@
+name: API
+
+on:
+  push:
+    branches: [main]
+    paths: ['api/**', '.github/workflows/api.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # The tests start SQL Server in Docker (Testcontainers), which the runner has.
+      - name: Test
+        run: dotnet test api/Habitat.slnx
+
+      - name: Sign in to GitHub's container registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      # Tagged with the commit, so each deploy names exactly what it runs, and "latest" for convenience.
+      - name: Build and push the image
+        run: >
+          dotnet publish api/Habitat.Api -c Release -t:PublishContainer
+          -p:ContainerRegistry=ghcr.io
+          -p:ContainerImageTags='"${{ github.sha }};latest"'

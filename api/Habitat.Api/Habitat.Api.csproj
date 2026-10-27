@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Published as a container by `dotnet publish -t:PublishContainer` (no Dockerfile needed); CI pushes it to ghcr.io. -->
+    <ContainerRepository>a-scratchy/habitat-api</ContainerRepository>
   </PropertyGroup>
 
   <ItemGroup>
