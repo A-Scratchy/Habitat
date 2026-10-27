@@ -4,6 +4,8 @@ import { adoptServerMember } from './data/actions';
 import { ApiError, CONNECTION_EVENT, forgetConnection, getMe, readConnection, saveConnection } from './data/api';
 import { db, selectHabitatDb } from './data/db';
 import { DEMO_HABITAT_ID, isDemo } from './data/example';
+import { isRemote, setRemote, useSyncStatus } from './data/remote';
+import { SyncBanner, useAutoSync } from './ui/SyncBanner';
 import { Browse } from './ui/Browse';
 import { BusyScreen } from './ui/Busy';
 import { DemoBanner } from './ui/Demo';
@@ -68,6 +70,7 @@ function Main() {
       </header>
 
       {isDemo() && <DemoBanner />}
+      {isRemote() && <SyncBanner />}
 
       <main>
         {tab === 'habitat' && (
@@ -126,6 +129,10 @@ export function App() {
   const [adopting, setAdopting] = useState(false);
   const [lookupError, setLookupError] = useState<string>();
   const missingHouseholdId = entraConfigured && connection?.status === 'approved' && !connection.householdId;
+  // A connected habitat's data lives on the server, and the local database is its copy.
+  const connected = entraConfigured && !demo && !adopting && connection?.status === 'approved' && connection.householdId ? connection : undefined;
+  const downloaded = useAutoSync(connected?.householdId);
+  const { online } = useSyncStatus();
 
   // Connections saved by older builds don't record which habitat they're in; ask once.
   useEffect(() => {
@@ -141,6 +148,7 @@ export function App() {
 
   // The demo needs no sign-in and no server: it lives in its own local database.
   if (demo) {
+    setRemote(undefined);
     selectHabitatDb(DEMO_HABITAT_ID);
     return (
       <HabitatProvider key={db.name} loading={<BusyScreen message="Opening the demo habitat…" />}>
@@ -151,6 +159,7 @@ export function App() {
 
   // With sign-in configured, nothing opens until this device belongs to a habitat.
   if (entraConfigured && (!connection || connection.status === 'pending' || adopting)) {
+    setRemote(undefined);
     return (
       <SignIn
         pending={connection?.status === 'pending' ? connection : undefined}
@@ -166,7 +175,11 @@ export function App() {
   if (missingHouseholdId) return <BusyScreen message="Finding your habitat…" error={lookupError} />;
 
   // Each habitat has its own local database; remount everything when it changes.
-  selectHabitatDb(entraConfigured ? connection?.householdId : undefined);
+  setRemote(connected);
+  selectHabitatDb(connected?.householdId);
+  // A device opening a connected habitat for the first time waits for its copy.
+  if (connected && !downloaded)
+    return <BusyScreen message="Downloading your habitat…" error={online ? undefined : 'Can’t reach the habitat right now. It will open once this device is back online.'} />;
   return (
     <HabitatProvider key={db.name} loading={<BusyScreen message="Opening your habitat…" />}>
       {(state) => (state === 'empty' ? <Welcome /> : <Main />)}

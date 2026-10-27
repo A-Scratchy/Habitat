@@ -7,6 +7,7 @@ import { ConfirmButton, ConfirmPanel } from './Confirm';
 import { AnimalPicker, NewMemberForm } from './Members';
 import { useHabitat } from './habitat';
 import { loadExample } from '../data/example';
+import { isRemote } from '../data/remote';
 
 function MembersAdmin() {
   const { members, me, setMe } = useHabitat();
@@ -66,7 +67,9 @@ function MembersAdmin() {
 function DataAdmin() {
   const { tends, members, rooms } = useHabitat();
   const [replace, setReplace] = useState(true);
-  const [mockDates, setMockDates] = useState(true);
+  const remote = isRemote();
+  // A connected habitat's wins are real, so it never gets pretend history.
+  const [mockDates, setMockDates] = useState(!remote);
   const [report, setReport] = useState<string[]>();
   /** A parsed file waiting for "yes, replace" before it overwrites the current tends. */
   const [pending, setPending] = useState<ReturnType<typeof parseTendsCsv>>();
@@ -103,9 +106,11 @@ function DataAdmin() {
       <label className="check">
         <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> Replace existing habits and quests
       </label>
-      <label className="check">
-        <input type="checkbox" checked={mockDates} onChange={(e) => setMockDates(e.target.checked)} /> Make up pretend “last done” dates (for trying things out)
-      </label>
+      {!remote && (
+        <label className="check">
+          <input type="checkbox" checked={mockDates} onChange={(e) => setMockDates(e.target.checked)} /> Make up pretend “last done” dates (for trying things out)
+        </label>
+      )}
       <label className="btn-soft file">
         Import a CSV…
         <input
@@ -122,7 +127,11 @@ function DataAdmin() {
       </label>
       {pending && (
         <ConfirmPanel
-          question={`Replace all ${tends.length} habits and quests, and this week’s wins, with ${pending.tends.length} from the file?`}
+          question={
+            remote
+              ? `Replace all ${tends.length} habits and quests in the habitat with ${pending.tends.length} from the file? The pack’s past wins stay.`
+              : `Replace all ${tends.length} habits and quests, and this week’s wins, with ${pending.tends.length} from the file?`
+          }
           confirmLabel="Yes, replace them"
           onConfirm={() => runImport(pending)}
           onCancel={() => setPending(undefined)}
@@ -139,12 +148,20 @@ function DataAdmin() {
       <button className="btn-soft" onClick={exportCsv}>
         Export habits and quests as CSV
       </button>
-      <ConfirmButton question="Reload the example household? This replaces all habits, quests and wins." confirmLabel="Yes, reload it" onConfirm={loadExample}>
-        Reload example household
-      </ConfirmButton>
-      <ConfirmButton className="link danger" question="Clear everything on this device: habits, quests, pack and wins?" confirmLabel="Yes, clear everything" onConfirm={resetEverything}>
-        Clear everything
-      </ConfirmButton>
+      {remote ? (
+        <ConfirmButton question="Throw away this device’s copy and download the whole habitat again? Nothing in the habitat changes." confirmLabel="Yes, download again" onConfirm={resetEverything}>
+          Download everything again
+        </ConfirmButton>
+      ) : (
+        <>
+          <ConfirmButton question="Reload the example household? This replaces all habits, quests and wins." confirmLabel="Yes, reload it" onConfirm={loadExample}>
+            Reload example household
+          </ConfirmButton>
+          <ConfirmButton className="link danger" question="Clear everything on this device: habits, quests, pack and wins?" confirmLabel="Yes, clear everything" onConfirm={resetEverything}>
+            Clear everything
+          </ConfirmButton>
+        </>
+      )}
     </div>
   );
 }

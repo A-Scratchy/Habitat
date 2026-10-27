@@ -6,6 +6,7 @@ type HabitatDexie = Dexie & {
   tends: EntityTable<Tend, 'id'>;
   members: EntityTable<Member, 'id'>;
   wins: EntityTable<Win, 'id'>;
+  meta: EntityTable<{ key: string; value: string }, 'key'>;
 };
 
 /** Used when sign-in isn't configured, and by the prototype before habitats existed. */
@@ -71,6 +72,14 @@ function open(name: string): HabitatDexie {
           delete t.ownerId;
         }),
     );
+  // A connected habitat remembers how far it has synced, next to the data it describes.
+  d.version(5).stores({
+    rooms: 'id, name',
+    tends: 'id, kind, status, roomId',
+    members: 'id',
+    wins: 'id, at',
+    meta: 'key',
+  });
   return d;
 }
 

@@ -49,7 +49,7 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(path: string, init: { method?: string; body?: unknown; bearer?: string } = {}): Promise<T> {
+export async function call<T>(path: string, init: { method?: string; body?: unknown; bearer?: string } = {}): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${base}${path}`, {
