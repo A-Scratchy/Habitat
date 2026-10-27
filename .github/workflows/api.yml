@@ -2,7 +2,7 @@ name: API
 
 on:
   push:
-    branches: [main]
+    branches: [main, preview]
     paths: ['api/**', '.github/workflows/api.yml']
   workflow_dispatch:
 
