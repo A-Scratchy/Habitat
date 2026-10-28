@@ -1038,3 +1038,37 @@ select {
     margin: 10px 16px 0;
   }
 }
+
+/* A phone turned sideways: the app steps aside for a calm "turn it upright" note (src/orientation.ts). */
+.turn-upright {
+  display: none;
+}
+
+[data-sideways] .turn-upright {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  background: var(--bg);
+  color: var(--ink);
+  text-align: center;
+}
+
+[data-sideways] .turn-upright p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.turn-upright-icon {
+  font-size: 40px;
+  transform: rotate(90deg);
+}
+
+[data-sideways] #root {
+  display: none;
+}

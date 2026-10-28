@@ -2,7 +2,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { initEntra } from './auth/entra';
+import { watchOrientation } from './orientation';
 import './styles.css';
+
+watchOrientation();
 
 const render = () =>
   createRoot(document.getElementById('root')!).render(

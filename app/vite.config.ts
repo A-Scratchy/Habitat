@@ -15,6 +15,8 @@ export default defineConfig({
         theme_color: '#e8eee4',
         background_color: '#f4f1ea',
         display: 'standalone',
+        // Honoured by the installed app on Android; elsewhere orientation.ts shows a gentle "turn it upright" screen.
+        orientation: 'portrait',
         icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
       workbox: { globPatterns: ['**/*.{js,css,html,svg,csv}'] },

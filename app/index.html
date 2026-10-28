@@ -9,6 +9,11 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Shown instead of the app when a phone is turned sideways (see src/orientation.ts). -->
+    <div class="turn-upright" role="alert" aria-live="polite">
+      <span class="turn-upright-icon" aria-hidden="true">📱</span>
+      <p>Habitat works best upright.<br />Turn your phone round when you’re ready 🌿</p>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
