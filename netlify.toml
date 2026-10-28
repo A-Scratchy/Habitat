@@ -1,0 +1,8 @@
+# The web app lives in app/; the API (api/) deploys to Azure separately.
+[build]
+  base = "app"
+  command = "npm run build"
+  publish = "dist"
+  # Only build when something under app/ changed since the last deploy (the "." is relative to base).
+  # A skipped build uses no build minutes, so API-only pushes cost nothing here.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ."
