@@ -180,7 +180,7 @@ public class HouseholdTests(ApiFixture api)
         var (robin, session) = await api.NewHousehold();
         var tablet = api.Client(session.DeviceToken);
         var jo = Guid.NewGuid();
-        (await tablet.PutAsJsonAsync($"/api/members/{jo}", new { name = "Jo", animal = "🐻" })).EnsureSuccessStatusCode();
+        (await tablet.PutAsJsonAsync($"/api/members/{jo}", new { name = "Jo", animal = "🐻", sound = "Chime" })).EnsureSuccessStatusCode();
 
         var joined = await (await api.Client(NewPerson()).PostAsJsonAsync("/api/auth/join", new JoinRequest((await api.NewCode(robin, PairingKind.User)).Code, "Jo's phone", MemberId: jo)))
             .Content.ReadFromJsonAsync<SessionResponse>(Json.Options);

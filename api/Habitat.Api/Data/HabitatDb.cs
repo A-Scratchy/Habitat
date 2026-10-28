@@ -36,6 +36,7 @@ public class HabitatDb(DbContextOptions<HabitatDb> options, ICurrentHousehold? c
         {
             e.Property(x => x.Name).HasMaxLength(40);
             e.Property(x => x.Animal).HasMaxLength(16);
+            e.Property(x => x.Sound).HasConversion<string>().HasMaxLength(16);
         });
 
         b.Entity<User>(e =>

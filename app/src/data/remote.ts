@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { ENERGY_ORDER, IMPACT_ORDER, TIER_ORDER, type Member, type Room, type Tend, type TendKind, type TendStatus, type Win } from '../domain/types';
+import { ENERGY_ORDER, IMPACT_ORDER, SOUND_ORDER, TIER_ORDER, type Member, type Room, type Tend, type TendKind, type TendStatus, type Win } from '../domain/types';
 import { ApiError, call, forgetConnection, type Connection } from './api';
 import { db } from './db';
 
@@ -70,6 +70,7 @@ interface SyncMember {
   id: string;
   name: string;
   animal: string;
+  sound: string;
   deletedAt: string | null;
 }
 
@@ -133,6 +134,10 @@ const iso = (ms: number | undefined) => (ms == null ? null : new Date(ms).toISOS
 
 export function roomFromServer(r: SyncRoom): Room {
   return { id: r.id, name: r.name, sortOrder: r.sortOrder, ...(r.icon && { icon: r.icon }) };
+}
+
+export function memberFromServer(m: SyncMember): Member {
+  return { id: m.id, name: m.name, animal: m.animal, sound: fromServer(m.sound, SOUND_ORDER) };
 }
 
 export function tendFromServer(t: SyncTend): Tend {
@@ -254,7 +259,7 @@ export const server = {
   },
   putRoom: (r: Room) => send(`/rooms/${r.id}`, 'PUT', { name: r.name, icon: r.icon ?? null, sortOrder: r.sortOrder }),
   deleteRoom: (id: string) => send(`/rooms/${id}`, 'DELETE'),
-  putMember: (m: Member) => send(`/members/${m.id}`, 'PUT', { name: m.name, animal: m.animal }),
+  putMember: (m: Member) => send(`/members/${m.id}`, 'PUT', { name: m.name, animal: m.animal, sound: toServer(m.sound) }),
   /** Only users may remove someone from the pack, so this takes their sign-in token rather than the device's. */
   deleteMember: (id: string, userToken: string) => send(`/members/${id}`, 'DELETE', undefined, userToken),
   putWin: (id: string, tendId: string, memberIds: string[], at: number) => send(`/wins/${id}`, 'PUT', { tendId, memberIds, at: iso(at) }),
@@ -279,7 +284,7 @@ async function pull(): Promise<void> {
     await target.rooms.bulkDelete(removed(r.rooms));
     await target.rooms.bulkPut(kept(r.rooms).map(roomFromServer));
     await target.members.bulkDelete(removed(r.members));
-    await target.members.bulkPut(kept(r.members).map((m) => ({ id: m.id, name: m.name, animal: m.animal })));
+    await target.members.bulkPut(kept(r.members).map(memberFromServer));
     await target.tends.bulkDelete(removed(r.tends));
     await target.tends.bulkPut(kept(r.tends).map(tendFromServer));
     await target.wins.bulkDelete(removed(r.wins));

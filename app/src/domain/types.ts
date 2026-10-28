@@ -74,10 +74,19 @@ export interface Quest extends TendBase {
 /** One thing that looks after the habitat. `kind` says which; it is always stated, never guessed. */
 export type Tend = Habit | Quest;
 
+/** What plays when someone finishes something. 'none' is a real choice: silence. */
+export type CompletionSound = 'chime' | 'bell' | 'wood' | 'birdsong' | 'bubble' | 'harp' | 'none';
+
+export const SOUND_ORDER: CompletionSound[] = ['chime', 'bell', 'wood', 'birdsong', 'bubble', 'harp', 'none'];
+
+/** Everyone starts on the soft chime (the agreed default) until they choose. */
+export const DEFAULT_SOUND: CompletionSound = 'chime';
+
 export interface Member {
   id: string;
   name: string;
   animal: string;
+  sound: CompletionSound;
 }
 
 export interface Win {

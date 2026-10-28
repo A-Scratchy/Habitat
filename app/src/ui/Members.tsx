@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { saveMember } from '../data/actions';
-import { ANIMALS } from '../domain/types';
+import { ANIMALS, DEFAULT_SOUND, SOUND_ORDER, type CompletionSound } from '../domain/types';
+import { playSound, SOUNDS } from './sounds';
 import { useHabitat } from './habitat';
 
 export function AnimalPicker({ value, onChange }: { value: string; onChange(animal: string): void }) {
@@ -9,6 +10,29 @@ export function AnimalPicker({ value, onChange }: { value: string; onChange(anim
       {ANIMALS.map((a) => (
         <button key={a} type="button" role="radio" aria-checked={a === value} className={`animal${a === value ? ' on' : ''}`} onClick={() => onChange(a)}>
           {a}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Choose the sound for finishing things. Tapping one plays it, so it can be tried before keeping it. */
+export function SoundPicker({ value, onChange }: { value: CompletionSound; onChange(sound: CompletionSound): void }) {
+  return (
+    <div className="chips wrap" role="radiogroup" aria-label="Sound when something is done">
+      {SOUND_ORDER.map((s) => (
+        <button
+          key={s}
+          type="button"
+          role="radio"
+          aria-checked={s === value}
+          className={`chip${s === value ? ' on' : ''}`}
+          onClick={() => {
+            playSound(s);
+            onChange(s);
+          }}
+        >
+          {SOUNDS[s].emoji} {SOUNDS[s].label}
         </button>
       ))}
     </div>
@@ -25,7 +49,7 @@ export function NewMemberForm({ onSaved }: { onSaved(id: string): void }) {
       onSubmit={async (e) => {
         e.preventDefault();
         if (!name.trim()) return;
-        onSaved(await saveMember({ name: name.trim(), animal }));
+        onSaved(await saveMember({ name: name.trim(), animal, sound: DEFAULT_SOUND }));
         setName('');
       }}
     >

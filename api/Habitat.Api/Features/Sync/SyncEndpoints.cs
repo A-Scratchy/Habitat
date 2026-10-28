@@ -7,7 +7,7 @@ namespace Habitat.Api.Features.Sync;
 
 public record SyncRoom(Guid Id, string Name, string? Icon, int SortOrder, DateTimeOffset UpdatedAt, DateTimeOffset? DeletedAt);
 
-public record SyncMember(Guid Id, string Name, string Animal, bool IsUser, DateTimeOffset UpdatedAt, DateTimeOffset? DeletedAt);
+public record SyncMember(Guid Id, string Name, string Animal, CompletionSound Sound, bool IsUser, DateTimeOffset UpdatedAt, DateTimeOffset? DeletedAt);
 
 /// <summary>FrequencyDays and RoomId are always set for habits; quests have no FrequencyDays and may have no room.</summary>
 public record SyncTend(
@@ -54,7 +54,7 @@ public static class SyncEndpoints
 
         var members = await db.Members
             .Where(m => m.RowVersion > from && m.RowVersion < upper && (!full || m.DeletedAt == null))
-            .Select(m => new SyncMember(m.Id, m.Name, m.Animal, userMembers.Contains(m.Id), m.UpdatedAt, m.DeletedAt))
+            .Select(m => new SyncMember(m.Id, m.Name, m.Animal, m.Sound, userMembers.Contains(m.Id), m.UpdatedAt, m.DeletedAt))
             .ToArrayAsync();
 
         var tends = await db.Tends

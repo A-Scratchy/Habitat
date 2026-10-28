@@ -4,7 +4,7 @@ import { parseTendsCsv, toTendsCsv } from '../domain/csv';
 import { dayKey } from '../domain/dates';
 import { AccountAdmin } from './Account';
 import { ConfirmButton, ConfirmPanel } from './Confirm';
-import { AnimalPicker, NewMemberForm } from './Members';
+import { AnimalPicker, NewMemberForm, SoundPicker } from './Members';
 import { useHabitat } from './habitat';
 import { loadExample } from '../data/example';
 import { isRemote } from '../data/remote';
@@ -24,6 +24,10 @@ function MembersAdmin() {
               <input defaultValue={m.name} onBlur={(e) => e.target.value.trim() && void saveMember({ ...m, name: e.target.value.trim() })} />
             </label>
             <AnimalPicker value={m.animal} onChange={(animal) => void saveMember({ ...m, animal })} />
+            <fieldset className="field">
+              <legend>Sound when they finish something</legend>
+              <SoundPicker value={m.sound} onChange={(sound) => void saveMember({ ...m, sound })} />
+            </fieldset>
             <div className="actions">
               <button className="btn-soft" onClick={() => setEditId(undefined)}>
                 Done

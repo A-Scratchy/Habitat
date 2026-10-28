@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Habit, Quest } from '../domain/types';
-import { patchToServer, tendFromServer, tendToServer, winFromServer } from './remote';
+import { memberFromServer, patchToServer, tendFromServer, tendToServer, winFromServer } from './remote';
 
 const serverTend = {
   id: 'h1',
@@ -84,5 +84,12 @@ describe('server shapes', () => {
   it('wins: the first member did it, the rest helped', () => {
     const w = winFromServer({ id: 'w', tendId: 'h1', tendName: 'Wipe sink', roomId: 'kitchen', roomName: 'Kitchen', at: '2026-10-27T08:00:00Z', memberIds: ['robin', 'sam'], deletedAt: null });
     expect(w).toEqual({ id: 'w', tendId: 'h1', tendName: 'Wipe sink', roomId: 'kitchen', room: 'Kitchen', memberId: 'robin', helperIds: ['sam'], at: Date.parse('2026-10-27T08:00:00Z') });
+  });
+
+  it('members keep their chosen sound, and an unknown one is refused', () => {
+    const m = { id: 'm', name: 'Robin', animal: '🦊', isUser: true, deletedAt: null };
+    expect(memberFromServer({ ...m, sound: 'Birdsong' })).toEqual({ id: 'm', name: 'Robin', animal: '🦊', sound: 'birdsong' });
+    expect(memberFromServer({ ...m, sound: 'None' }).sound).toBe('none');
+    expect(() => memberFromServer({ ...m, sound: 'Klaxon' })).toThrow(/Klaxon/);
   });
 });

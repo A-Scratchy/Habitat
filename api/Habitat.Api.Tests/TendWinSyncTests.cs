@@ -223,7 +223,7 @@ public class TendWinSyncTests(ApiFixture api)
     {
         var (_, device, robin, habitId) = await Setup();
         var leo = Guid.NewGuid();
-        (await device.PutAsJsonAsync($"/api/members/{leo}", new { name = "Leo", animal = "🐻" })).EnsureSuccessStatusCode();
+        (await device.PutAsJsonAsync($"/api/members/{leo}", new { name = "Leo", animal = "🐻", sound = "Bell" })).EnsureSuccessStatusCode();
 
         var winId = Guid.NewGuid();
         (await LogWin(device, habitId, [leo, robin], winId: winId)).EnsureSuccessStatusCode();
@@ -326,7 +326,7 @@ public class TendWinSyncTests(ApiFixture api)
     {
         var (entra, device, robin, _) = await Setup();
         var leo = Guid.NewGuid();
-        (await device.PutAsJsonAsync($"/api/members/{leo}", new { name = "Leo", animal = "🐻" })).EnsureSuccessStatusCode();
+        (await device.PutAsJsonAsync($"/api/members/{leo}", new { name = "Leo", animal = "🐻", sound = "Bell" })).EnsureSuccessStatusCode();
         var leosHabit = Guid.NewGuid();
         (await device.PutAsJsonAsync($"/api/tends/{leosHabit}", Bins(owner: leo), Json.Options)).EnsureSuccessStatusCode();
 
@@ -336,6 +336,21 @@ public class TendWinSyncTests(ApiFixture api)
 
         Assert.Null((await Tend(device, leosHabit)).OwnerMemberId);
         Assert.DoesNotContain((await Sync(device)).Members, m => m.Id == leo);
+    }
+
+    [Fact]
+    public async Task Members_choose_their_sound_starting_from_the_soft_chime()
+    {
+        var (_, device, robin, _) = await Setup();
+        Assert.Equal(CompletionSound.Chime, (await Sync(device)).Members.Single(m => m.Id == robin).Sound);
+
+        var leo = Guid.NewGuid();
+        (await device.PutAsJsonAsync($"/api/members/{leo}", new { name = "Leo", animal = "🐻", sound = "None" })).EnsureSuccessStatusCode();
+        Assert.Equal(CompletionSound.None, (await Sync(device)).Members.Single(m => m.Id == leo).Sound);
+
+        // Nothing is assumed: a sound must be named, and must be one the app knows.
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PutAsJsonAsync($"/api/members/{leo}", new { name = "Leo", animal = "🐻" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PutAsJsonAsync($"/api/members/{leo}", new { name = "Leo", animal = "🐻", sound = "Klaxon" })).StatusCode);
     }
 
     [Fact]
@@ -433,7 +448,7 @@ public class TendWinSyncTests(ApiFixture api)
     {
         var (_, device, robin, _) = await Setup();
         var leo = Guid.NewGuid();
-        (await device.PutAsJsonAsync($"/api/members/{leo}", new { name = "Leo", animal = "🐻" })).EnsureSuccessStatusCode();
+        (await device.PutAsJsonAsync($"/api/members/{leo}", new { name = "Leo", animal = "🐻", sound = "Bell" })).EnsureSuccessStatusCode();
 
         var forLeo = Guid.NewGuid();
         Assert.Equal(HttpStatusCode.NoContent, (await device.PutAsJsonAsync($"/api/tends/{forLeo}", Tip() with { OpenToEveryone = false, AvailableTo = [leo] }, Json.Options)).StatusCode);
@@ -475,7 +490,7 @@ public class TendWinSyncTests(ApiFixture api)
     {
         var (entra, device, robin, _) = await Setup();
         var leo = Guid.NewGuid();
-        (await device.PutAsJsonAsync($"/api/members/{leo}", new { name = "Leo", animal = "🐻" })).EnsureSuccessStatusCode();
+        (await device.PutAsJsonAsync($"/api/members/{leo}", new { name = "Leo", animal = "🐻", sound = "Bell" })).EnsureSuccessStatusCode();
         var questId = Guid.NewGuid();
         (await device.PutAsJsonAsync($"/api/tends/{questId}", Tip() with { OpenToEveryone = false, AvailableTo = [leo, robin] }, Json.Options)).EnsureSuccessStatusCode();
 

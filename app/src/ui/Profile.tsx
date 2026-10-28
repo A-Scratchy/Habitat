@@ -5,7 +5,7 @@ import { isDemo, leaveDemo } from '../data/example';
 import { saveMember } from '../data/actions';
 import { useHabitat } from './habitat';
 import { ConfirmButton } from './Confirm';
-import { AnimalPicker } from './Members';
+import { AnimalPicker, SoundPicker } from './Members';
 
 /** The header avatar's menu: who you are on this device, and your sign-in. */
 export function ProfileSheet({ onClose, onOpenAccountSettings }: { onClose(): void; onOpenAccountSettings(): void }) {
@@ -62,6 +62,10 @@ export function ProfileSheet({ onClose, onOpenAccountSettings }: { onClose(): vo
           <fieldset className="field">
             <legend>Your animal</legend>
             <AnimalPicker value={me.animal} onChange={(animal) => void saveMember({ ...me, animal })} />
+          </fieldset>
+          <fieldset className="field">
+            <legend>Sound when you finish something</legend>
+            <SoundPicker value={me.sound} onChange={(sound) => void saveMember({ ...me, sound })} />
           </fieldset>
         </form>
 

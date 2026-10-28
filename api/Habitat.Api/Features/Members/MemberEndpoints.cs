@@ -9,7 +9,9 @@ namespace Habitat.Api.Features.Members;
 
 public record MemberInput(
     [Required, StringLength(40, MinimumLength = 1)] string Name,
-    [Required, StringLength(16, MinimumLength = 1)] string Animal);
+    [Required, StringLength(16, MinimumLength = 1)] string Animal,
+    /// <summary>Required: what plays when they finish something (None for silence).</summary>
+    [Required] CompletionSound? Sound);
 
 public static class MemberEndpoints
 {
@@ -41,6 +43,7 @@ public static class MemberEndpoints
 
         member.Name = input.Name.Trim();
         member.Animal = input.Animal;
+        member.Sound = input.Sound!.Value;
         member.UpdatedAt = clock.GetUtcNow();
         await db.SaveChangesAsync();
         return TypedResults.NoContent();

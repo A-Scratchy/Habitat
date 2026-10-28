@@ -1,7 +1,7 @@
 import { dayKey } from '../domain/dates';
 import { type ParsedTend } from '../domain/csv';
 import { mockHistory } from '../domain/mock';
-import { ANIMALS, byRoomOrder, type DistributiveOmit, type Member, type Room, type Tend, type Win } from '../domain/types';
+import { ANIMALS, byRoomOrder, DEFAULT_SOUND, type DistributiveOmit, type Member, type Room, type Tend, type Win } from '../domain/types';
 import { userToken } from '../auth/entra';
 import { db, newId } from './db';
 import { isRemote, redownload, server, syncNow } from './remote';
@@ -202,7 +202,7 @@ export async function importTends(parsed: ParsedTend[], opts: ImportOptions): Pr
   const named = parsed.flatMap((p) => [p.ownerName, ...(Array.isArray(p.availableToNames) ? p.availableToNames : [])]);
   for (const name of named) {
     if (!name || byName.has(name.toLowerCase())) continue;
-    const m: Member = { id: newId(), name, animal: ANIMALS[members.length % ANIMALS.length] };
+    const m: Member = { id: newId(), name, animal: ANIMALS[members.length % ANIMALS.length], sound: DEFAULT_SOUND };
     members.push(m);
     newMembers.push(m);
     byName.set(m.name.toLowerCase(), m);
@@ -266,7 +266,8 @@ export async function importTends(parsed: ParsedTend[], opts: ImportOptions): Pr
  * what sync downloads, and selects them. Returns the member id to remember as "me".
  */
 export async function adoptServerMember(me: { memberId: string; name: string; animal: string }): Promise<string> {
-  if (!(await db.members.get(me.memberId))) await db.members.put({ id: me.memberId, name: me.name, animal: me.animal });
+  // A new user starts on the default sound, as the server does; the next sync brings the real one.
+  if (!(await db.members.get(me.memberId))) await db.members.put({ id: me.memberId, name: me.name, animal: me.animal, sound: DEFAULT_SOUND });
   return me.memberId;
 }
 

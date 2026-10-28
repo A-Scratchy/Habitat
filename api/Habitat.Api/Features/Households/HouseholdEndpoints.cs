@@ -26,7 +26,7 @@ public record JoinRequest(
 
 public record HouseholdDto(Guid Id, string Name, string TimeZoneId);
 
-public record MemberDto(Guid Id, string Name, string Animal, bool IsUser);
+public record MemberDto(Guid Id, string Name, string Animal, CompletionSound Sound, bool IsUser);
 
 /// <summary>A device token plus where it belongs. Status is "approved", or "pending" until a user approves it.</summary>
 public record SessionResponse(string DeviceToken, Guid DeviceId, string Status, HouseholdDto Household, Guid MemberId);
@@ -160,7 +160,7 @@ public static class HouseholdEndpoints
         var members = await db.Members
             .Where(m => m.DeletedAt == null)
             .OrderBy(m => m.Name)
-            .Select(m => new MemberDto(m.Id, m.Name, m.Animal, userMembers.Contains(m.Id)))
+            .Select(m => new MemberDto(m.Id, m.Name, m.Animal, m.Sound, userMembers.Contains(m.Id)))
             .ToArrayAsync();
         return TypedResults.Ok(new MeResponse(principal.DeviceId(), ToDto(household), members));
     }

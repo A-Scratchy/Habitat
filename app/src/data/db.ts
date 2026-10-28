@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Member, Room, Tend, Win } from '../domain/types';
+import { DEFAULT_SOUND, type Member, type Room, type Tend, type Win } from '../domain/types';
 
 type HabitatDexie = Dexie & {
   rooms: EntityTable<Room, 'id'>;
@@ -80,6 +80,23 @@ function open(name: string): HabitatDexie {
     wins: 'id, at',
     meta: 'key',
   });
+  // Members choose a sound for finishing things. Everyone already here starts on the agreed default.
+  d.version(6)
+    .stores({
+      rooms: 'id, name',
+      tends: 'id, kind, status, roomId',
+      members: 'id',
+      wins: 'id, at',
+      meta: 'key',
+    })
+    .upgrade((tx) =>
+      tx
+        .table('members')
+        .toCollection()
+        .modify((m: Record<string, unknown>) => {
+          m.sound ??= DEFAULT_SOUND;
+        }),
+    );
   return d;
 }
 

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { completeTends, undoWins } from '../data/actions';
+import { playSound, primeSound } from './sounds';
 import { db } from '../data/db';
 import { readLocal, writeLocal } from '../data/local';
 import { DAY, startOfDay, startOfWeek } from '../domain/dates';
@@ -83,7 +84,12 @@ export function HabitatProvider({ children, loading }: { children: (state: 'load
     async (tendIds: string[], opts: { memberIds?: string[]; at?: number } = {}) => {
       const memberIds = opts.memberIds ?? (meId ? [meId] : []);
       if (!memberIds.length) return;
+      // Ready the sound while this is still the tap: browsers won't start audio after the wait.
+      primeSound();
       const winIds = await completeTends(tendIds, memberIds, opts.at);
+      // The sound of whoever's using this device, once it's actually saved.
+      const sound = members?.find((m) => m.id === meId)?.sound;
+      if (sound) playSound(sound);
       const quest = tendIds.length === 1 && tends?.find((x) => x.id === tendIds[0])?.kind === 'quest';
       const message =
         quest
@@ -95,7 +101,7 @@ export function HabitatProvider({ children, loading }: { children: (state: 'load
             : CHEERS[Math.floor(Math.random() * CHEERS.length)];
       showToast({ message, winIds });
     },
-    [meId, tends, showToast],
+    [meId, tends, members, showToast],
   );
 
   const value = useMemo<Habitat | null>(() => {

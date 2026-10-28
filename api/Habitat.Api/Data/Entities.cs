@@ -31,9 +31,23 @@ public class Member : HouseholdEntity, ISynced
 {
     public required string Name { get; set; }
     public required string Animal { get; set; }
+    /// <summary>What plays on their device when they finish something. New members start on the soft Chime (agreed default).</summary>
+    public CompletionSound Sound { get; set; } = CompletionSound.Chime;
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
     public long RowVersion { get; set; }
+}
+
+/// <summary>Gentle sounds, made by the app itself (no audio files). None is a real choice: silence.</summary>
+public enum CompletionSound
+{
+    Chime,
+    Bell,
+    Wood,
+    Birdsong,
+    Bubble,
+    Harp,
+    None,
 }
 
 /// <summary>

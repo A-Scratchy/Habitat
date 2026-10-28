@@ -320,7 +320,7 @@ describe('csv import', () => {
       { id: 'g', name: 'Garden', sortOrder: 0 },
       { id: 'h', name: 'Hall', sortOrder: 1 },
     ];
-    const { tends, errors } = parseTendsCsv(toTendsCsv([h, q], [{ id: 'm1', name: 'Alex', animal: '🦊' }], rooms));
+    const { tends, errors } = parseTendsCsv(toTendsCsv([h, q], [{ id: 'm1', name: 'Alex', animal: '🦊', sound: 'chime' as const }], rooms));
     expect(errors).toEqual([]);
     expect(tends[0]).toMatchObject({ kind: 'habit', name: 'Feed birds', roomName: 'Garden', group: 'Birds', tier: 'tortoise', impact: 'large', energy: ['transition'], frequencyDays: 2, ownerName: 'Alex', status: 'active', description: 'Seed in the shed' });
     expect(tends[1]).toMatchObject({ kind: 'quest', name: 'Clear loft', completed: true });
@@ -369,7 +369,7 @@ describe('mock history', () => {
   it('only dates active habits, never in the future, with wins for the last week', () => {
     let n = 0;
     const tends = [habit({ frequencyDays: 7 }), quest(), habit({ frequencyDays: 365 })];
-    const members = [{ id: 'm', name: 'Alex', animal: '🦊' }];
+    const members = [{ id: 'm', name: 'Alex', animal: '🦊', sound: 'chime' as const }];
     const out = mockHistory(tends, [], members, NOW, () => `w${++n}`, () => 0.2);
     expect(out.tends[1].lastDone).toBeUndefined();
     expect(out.tends.every((t) => t.lastDone == null || t.lastDone <= NOW)).toBe(true);
