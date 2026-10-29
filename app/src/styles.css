@@ -58,7 +58,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
   color: inherit;
 }
@@ -679,6 +680,7 @@ label.btn-done.disabled {
 
 .field input,
 .field select,
+.field textarea,
 select {
   min-height: 44px;
   padding: 8px 12px;

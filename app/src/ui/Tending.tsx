@@ -221,7 +221,7 @@ function TendEditor({ initial, onClose }: { initial: Form; onClose(): void }) {
       <datalist id="groups">{groups.map((g) => <option key={g} value={g} />)}</datalist>
 
       <label className="field">
-        <span>Description or how-to (optional; one step per line)</span>
+        <span>Instructions (optional; one step per line)</span>
         <textarea
           value={f.description}
           onChange={(e) => set({ description: e.target.value })}

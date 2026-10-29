@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { setFrequency, updateTend, type CommonTendFields } from '../data/actions';
 import { DAY, dayKey, parseDay } from '../domain/dates';
-import { IMPACT_ORDER, IMPACTS, KINDS, OUT_AND_ABOUT, STATUSES, TIER_ORDER, TIERS, type Tend, type TendStatus } from '../domain/types';
+import { DESCRIPTION_MAX, IMPACT_ORDER, IMPACTS, KINDS, OUT_AND_ABOUT, STATUSES, TIER_ORDER, TIERS, type Tend, type TendStatus } from '../domain/types';
 import { useHabitat } from './habitat';
 
 type When = 'today' | 'yesterday' | 'twoDays' | 'pick';
@@ -71,6 +71,45 @@ function LogPanel({ tend, defaultWho, onClose }: { tend: Tend; defaultWho: strin
   );
 }
 
+/** The how-to, written here as well as in Tending. Saved with a button rather than per keystroke, so typing isn't a stream of saves. */
+function InstructionsField({ tend }: { tend: Tend }) {
+  const saved = tend.description ?? '';
+  const [text, setText] = useState(saved);
+  const [saving, setSaving] = useState(false);
+  // Pick up changes saved elsewhere (another device, or the Tending tab) while nothing's being typed here.
+  useEffect(() => setText(saved), [saved]);
+  const changed = text.trim() !== saved;
+
+  return (
+    <label className="field">
+      <span>Instructions (optional; one step per line)</span>
+      <textarea rows={4} maxLength={DESCRIPTION_MAX} value={text} onChange={(e) => setText(e.target.value)} placeholder={'e.g.\nEmpty the dishwasher\nWipe the counters'} />
+      {changed && (
+        <div className="actions">
+          <button
+            type="button"
+            className="btn-soft"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await updateTend(tend.id, { description: text.trim() || undefined });
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving ? 'Saving…' : 'Save instructions'}
+          </button>
+          <button type="button" className="link" disabled={saving} onClick={() => setText(saved)}>
+            Undo changes
+          </button>
+        </div>
+      )}
+    </label>
+  );
+}
+
 /** Quick tweaks to the master tend; saved as you tap. Everything else is in the Tending tab. */
 function TweakPanel({ tend }: { tend: Tend }) {
   const save = (patch: Partial<CommonTendFields>) => void updateTend(tend.id, patch);
@@ -121,6 +160,8 @@ function TweakPanel({ tend }: { tend: Tend }) {
       </fieldset>
       )}
 
+      <InstructionsField tend={tend} />
+
       <fieldset className="field">
         <legend>Status</legend>
         <div className="chips wrap">
@@ -131,7 +172,7 @@ function TweakPanel({ tend }: { tend: Tend }) {
           ))}
         </div>
       </fieldset>
-      <p className="muted small">Changes save straight away. Everything else, including switching between habit and quest, is in the Tending tab.</p>
+      <p className="muted small">Changes save straight away (instructions when you tap Save). Everything else, including switching between habit and quest, is in the Tending tab.</p>
     </div>
   );
 }
