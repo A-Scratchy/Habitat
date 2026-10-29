@@ -27,6 +27,16 @@
   background: linear-gradient(to bottom, transparent, var(--sage-soft));
 }
 
+/* The den: a soft earthy hollow at the left end, where sleepers curl up together. */
+.meadow-den {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 22px;
+  border-radius: 0 22px 0 0;
+  background: radial-gradient(ellipse at 40% 100%, var(--surface-2), transparent 75%);
+}
+
 .critter {
   position: absolute;
   bottom: 4px;
@@ -66,6 +76,57 @@
   transform: scaleX(-1);
 }
 
+.critter-hop.twitch {
+  animation: meadow-twitch 0.5s ease-in-out both;
+}
+
+/* Asleep: a little lower and slowly breathing, with a 💤 drifting up now and then. */
+.critter-body.asleep {
+  position: relative;
+  font-size: 22px;
+  animation: meadow-breathe 3.5s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+.zz {
+  position: absolute;
+  left: 70%;
+  bottom: 70%;
+  font-size: 11px;
+  opacity: 0;
+  animation: meadow-zz 4.5s ease-out infinite;
+}
+
+@keyframes meadow-breathe {
+  50% {
+    transform: scaleY(0.94);
+  }
+}
+
+@keyframes meadow-zz {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  20% {
+    opacity: 0.8;
+  }
+  60%,
+  100% {
+    opacity: 0;
+    transform: translate(6px, -12px);
+  }
+}
+
+@keyframes meadow-twitch {
+  30% {
+    transform: rotate(-8deg);
+  }
+  60% {
+    transform: rotate(6deg);
+  }
+}
+
 @keyframes meadow-amble {
   50% {
     transform: translateY(-2px);
@@ -88,7 +149,14 @@
     transition: none;
   }
   .critter-body.walking,
-  .critter-hop.hop {
+  .critter-body.asleep,
+  .critter-hop.hop,
+  .critter-hop.twitch {
     animation: none;
+  }
+  /* The 💤 stays, still, so sleepers still read as asleep. */
+  .zz {
+    animation: none;
+    opacity: 0.7;
   }
 }
