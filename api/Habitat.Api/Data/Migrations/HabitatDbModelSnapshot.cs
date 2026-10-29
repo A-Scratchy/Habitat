@@ -28,6 +28,12 @@ namespace Habitat.Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset?>("ActiveAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ActiveMemberId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset?>("ApprovedAt")
                         .HasColumnType("datetimeoffset");
 

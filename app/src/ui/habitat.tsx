@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useLiveQuery } from 'dexie-react-hooks';
 import { completeTends, undoWins } from '../data/actions';
 import { playSound, primeSound } from './sounds';
+import { celebrate } from '../meadow/events';
 import { db } from '../data/db';
 import { readLocal, writeLocal } from '../data/local';
 import { DAY, startOfDay, startOfWeek } from '../domain/dates';
@@ -90,6 +91,7 @@ export function HabitatProvider({ children, loading }: { children: (state: 'load
       // The sound of whoever's using this device, once it's actually saved.
       const sound = members?.find((m) => m.id === meId)?.sound;
       if (sound) playSound(sound);
+      celebrate();
       const quest = tendIds.length === 1 && tends?.find((x) => x.id === tendIds[0])?.kind === 'quest';
       const message =
         quest

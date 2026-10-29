@@ -49,7 +49,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function call<T>(path: string, init: { method?: string; body?: unknown; bearer?: string } = {}): Promise<T> {
+export async function call<T>(path: string, init: { method?: string; body?: unknown; bearer?: string; keepalive?: boolean } = {}): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${base}${path}`, {
@@ -59,6 +59,7 @@ export async function call<T>(path: string, init: { method?: string; body?: unkn
         ...(init.bearer && { Authorization: `Bearer ${init.bearer}` }),
       },
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      keepalive: init.keepalive,
     });
   } catch {
     throw new ApiError(0, 'Can’t reach the Habitat server. Check your connection and try again.');

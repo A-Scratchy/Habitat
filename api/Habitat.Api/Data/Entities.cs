@@ -78,6 +78,10 @@ public class Device : HouseholdEntity
     public DateTimeOffset LastSeenAt { get; set; }
     /// <summary>Set when a user signed in on this device rather than it being paired.</summary>
     public Guid? UserId { get; set; }
+    /// <summary>Who is using the app on this device right now, as it last reported (presence). Null when nobody is.</summary>
+    public Guid? ActiveMemberId { get; set; }
+    /// <summary>When it last reported. Presence fades out a little while after this.</summary>
+    public DateTimeOffset? ActiveAt { get; set; }
 }
 
 public enum PairingKind

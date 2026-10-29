@@ -6,6 +6,7 @@ import { db, selectHabitatDb } from './data/db';
 import { DEMO_HABITAT_ID, isDemo } from './data/example';
 import { isRemote, setRemote, useSyncStatus } from './data/remote';
 import { SyncBanner, useAutoSync } from './ui/SyncBanner';
+import { Meadow } from './meadow/Meadow';
 import { Browse } from './ui/Browse';
 import { BusyScreen } from './ui/Busy';
 import { DemoBanner } from './ui/Demo';
@@ -98,6 +99,8 @@ function Main() {
           }}
         />
       )}
+
+      <Meadow />
 
       <nav className="tabbar" aria-label="Screens">
         {TABS.map((t) => (

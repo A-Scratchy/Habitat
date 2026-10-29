@@ -7,6 +7,7 @@ import { ConfirmButton, ConfirmPanel } from './Confirm';
 import { AnimalPicker, NewMemberForm, SoundPicker } from './Members';
 import { useHabitat } from './habitat';
 import { loadExample } from '../data/example';
+import { MeadowSetting } from '../meadow/MeadowSetting';
 import { isRemote } from '../data/remote';
 
 function MembersAdmin() {
@@ -61,6 +62,7 @@ function MembersAdmin() {
           ＋ Add someone
         </button>
       )}
+      <MeadowSetting />
       <button className="link" onClick={() => setMe(undefined)}>
         Switch who’s using this device
       </button>

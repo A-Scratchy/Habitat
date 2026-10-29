@@ -7,6 +7,7 @@ using Habitat.Api.Features.Tends;
 using Habitat.Api.Features.Households;
 using Habitat.Api.Features.Members;
 using Habitat.Api.Features.Rooms;
+using Habitat.Api.Features.Presence;
 using Habitat.Api.Features.Sync;
 using Habitat.Api.Features.Wins;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -75,6 +76,7 @@ api.MapRoomEndpoints();
 api.MapTendEndpoints();
 api.MapWinEndpoints();
 api.MapSyncEndpoints();
+api.MapPresenceEndpoints();
 
 app.Run();
 

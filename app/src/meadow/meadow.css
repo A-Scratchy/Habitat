@@ -1,0 +1,94 @@
+/* The meadow strip, just above the tab bar. Everything here belongs to the meadow. */
+
+:root {
+  --meadow-height: 44px;
+}
+
+/* Leave room for the meadow so it never covers the last thing on a screen, and lift the toast above it. */
+[data-meadow] .shell {
+  padding-bottom: calc(76px + var(--meadow-height) + env(safe-area-inset-bottom));
+}
+
+[data-meadow] .toast-region {
+  bottom: calc(84px + var(--meadow-height) + env(safe-area-inset-bottom));
+}
+
+.meadow {
+  position: fixed;
+  left: 0;
+  right: 0;
+  /* Sits on the tab bar (set by Meadow from the bar's real height). */
+  bottom: var(--meadow-bottom, calc(64px + env(safe-area-inset-bottom)));
+  height: var(--meadow-height);
+  z-index: 4;
+  overflow: hidden;
+  pointer-events: none;
+  /* A soft grassy fade, so it reads as ground rather than another bar. */
+  background: linear-gradient(to bottom, transparent, var(--sage-soft));
+}
+
+.critter {
+  position: absolute;
+  bottom: 4px;
+  transform: translateX(-50%);
+  transition-property: left;
+  transition-timing-function: linear;
+}
+
+.critter-hop {
+  display: inline-block;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.critter-hop.hop {
+  animation: meadow-hop 0.6s ease-out both;
+}
+
+.critter-body {
+  display: inline-block;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.critter-body.walking {
+  animation: meadow-amble 0.7s ease-in-out infinite;
+}
+
+/* Most animal emoji face left; mirror them when they walk right. */
+.critter-face {
+  display: inline-block;
+}
+
+.critter-face.right {
+  transform: scaleX(-1);
+}
+
+@keyframes meadow-amble {
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes meadow-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-14px);
+  }
+}
+
+/* "Reduce motion": the pack just sits in the meadow. */
+@media (prefers-reduced-motion: reduce) {
+  .critter {
+    transition: none;
+  }
+  .critter-body.walking,
+  .critter-hop.hop {
+    animation: none;
+  }
+}
