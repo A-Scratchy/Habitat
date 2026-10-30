@@ -4,7 +4,7 @@ import { forgetConnection, getMe, readConnection, type MeResponse } from '../dat
 import { isDemo } from '../data/example';
 import { ConfirmButton } from './Confirm';
 
-/** This device's place in the habitat. Habits and quests still live only on this device until sync lands. */
+/** This device's place in the habitat, and who's signed in on it. */
 export function AccountAdmin() {
   const [connection] = useState(readConnection);
   const account = signedInAccount();
@@ -26,7 +26,6 @@ export function AccountAdmin() {
           In <strong>{connection.householdName ?? 'your habitat'}</strong> 🌿
         </p>
         <p className="muted small">{account ? `Signed in as ${account.username}` : 'This device joined with a code; nobody is signed in on it.'}</p>
-        <p className="muted small">Sharing habits, quests and wins between devices comes next. For now they still live on this device.</p>
       </div>
       {!account && (
         <button className="btn-soft" onClick={() => void signIn()}>

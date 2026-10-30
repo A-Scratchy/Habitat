@@ -1074,3 +1074,23 @@ select {
 [data-sideways] #root {
   display: none;
 }
+
+/* Settings → Devices: a code to show someone */
+.share-code {
+  align-items: center;
+  text-align: center;
+}
+
+.qr {
+  border-radius: 12px;
+  background: #fff;
+  padding: 6px;
+}
+
+.big-code {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+}

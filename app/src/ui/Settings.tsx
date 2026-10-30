@@ -3,6 +3,7 @@ import { deleteMember, importTends, resetEverything, saveMember } from '../data/
 import { parseTendsCsv, toTendsCsv } from '../domain/csv';
 import { dayKey } from '../domain/dates';
 import { AccountAdmin } from './Account';
+import { DevicesAdmin } from './Devices';
 import { ConfirmButton, ConfirmPanel } from './Confirm';
 import { AnimalPicker, NewMemberForm, SoundPicker } from './Members';
 import { useHabitat } from './habitat';
@@ -172,29 +173,31 @@ function DataAdmin() {
   );
 }
 
-export type SettingsTab = 'pack' | 'data' | 'account';
+export type SettingsTab = 'pack' | 'devices' | 'data' | 'account';
 
 export function Settings({ initialTab }: { initialTab?: SettingsTab }) {
   const [tab, setTab] = useState<SettingsTab>(initialTab ?? 'pack');
+  // Devices only exist for a habitat on the server (not the demo or a local-only one).
+  const tabs: [SettingsTab, string][] = [
+    ['pack', '🐾 The pack'],
+    ...(isRemote() ? ([['devices', '📱 Devices']] as [SettingsTab, string][]) : []),
+    ['data', '📦 Import & export'],
+    ['account', '☁️ Household account'],
+  ];
   return (
     <section className="screen">
       <header className="screen-head">
         <h2>Settings</h2>
       </header>
       <div className="chips" role="tablist">
-        {(
-          [
-            ['pack', '🐾 The pack'],
-            ['data', '📦 Import & export'],
-            ['account', '☁️ Household account'],
-          ] as const
-        ).map(([id, label]) => (
+        {tabs.map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id} className={`chip${tab === id ? ' on' : ''}`} onClick={() => setTab(id)}>
             {label}
           </button>
         ))}
       </div>
       {tab === 'pack' && <MembersAdmin />}
+      {tab === 'devices' && <DevicesAdmin />}
       {tab === 'data' && <DataAdmin />}
       {tab === 'account' && <AccountAdmin />}
     </section>

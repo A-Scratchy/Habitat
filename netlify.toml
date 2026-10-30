@@ -6,3 +6,9 @@
   # Only build when something under app/ changed since the last deploy (the "." is relative to base).
   # A skipped build uses no build minutes, so API-only pushes cost nothing here.
   ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ."
+
+# Join links (/join#CODE, /join/user#CODE) and any other path open the app itself.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

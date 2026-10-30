@@ -12,6 +12,7 @@ import {
   type Connection,
 } from '../data/api';
 import { startDemo } from '../data/example';
+import { clearJoin, pendingJoin } from '../data/join';
 import { ANIMALS } from '../domain/types';
 import { BusyScreen, SignInStatus } from './Busy';
 import { AnimalPicker } from './Members';
@@ -32,7 +33,13 @@ const POLL_MS = 4000;
  */
 export function SignIn({ pending, onConnected }: { pending?: Connection; onConnected(c: Connection): void }) {
   const [step, setStep] = useState<Step>(() =>
-    pending ? { kind: 'waiting', connection: pending } : signedInAccount() ? { kind: 'checking' } : { kind: 'start' },
+    pending
+      ? { kind: 'waiting', connection: pending }
+      : pendingJoin('device')
+        ? { kind: 'code' }
+        : signedInAccount()
+          ? { kind: 'checking' }
+          : { kind: 'start' },
   );
   const [error, setError] = useState<string>();
   const account = signedInAccount();
@@ -52,6 +59,7 @@ export function SignIn({ pending, onConnected }: { pending?: Connection; onConne
 
   /** Pending connections wait for approval; approved ones open the app. */
   const connected = (c: Connection) => {
+    clearJoin();
     saveConnection(c);
     if (c.status === 'pending') setStep({ kind: 'waiting', connection: c });
     else onConnected(c);
@@ -120,6 +128,10 @@ export function SignIn({ pending, onConnected }: { pending?: Connection; onConne
 
       <SignInStatus waitingForApproval={step.kind === 'waiting'} />
       {error && <p className="panel error small">{error}</p>}
+
+      {step.kind === 'start' && pendingJoin('user') && !account && (
+        <p className="panel small">🔑 You’ve been invited to a habitat. Sign in with your email to accept; the invite code is kept for you.</p>
+      )}
 
       {step.kind === 'start' && (
         <div className="stack">
@@ -193,7 +205,7 @@ export function SignIn({ pending, onConnected }: { pending?: Connection; onConne
 }
 
 function DeviceCode({ onBack, onJoined, onError }: { onBack(): void; onJoined(c: Connection): void; onError(e: unknown): void }) {
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(() => pendingJoin('device') ?? '');
   const [busy, setBusy] = useState(false);
   return (
     <form
@@ -216,7 +228,14 @@ function DeviceCode({ onBack, onJoined, onError }: { onBack(): void; onJoined(c:
       <button className="btn-done wide" disabled={busy || code.replace(/[^a-z0-9]/gi, '').length < 8}>
         {busy ? 'Joining…' : 'Join'}
       </button>
-      <button type="button" className="link" onClick={onBack}>
+      <button
+        type="button"
+        className="link"
+        onClick={() => {
+          clearJoin();
+          onBack();
+        }}
+      >
         Back
       </button>
     </form>
@@ -225,9 +244,10 @@ function DeviceCode({ onBack, onJoined, onError }: { onBack(): void; onJoined(c:
 
 /** Signed in, but this email isn't part of a habitat yet: start one, or join one with an invite. */
 function NewHere({ onDone, onError }: { onDone(c: Connection): void; onError(e: unknown): void }) {
-  const [mode, setMode] = useState<'start' | 'join'>('start');
+  // An invite link opens this on "I have an invite", with its code filled in.
+  const [mode, setMode] = useState<'start' | 'join'>(() => (pendingJoin('user') ? 'join' : 'start'));
   const [householdName, setHouseholdName] = useState('Our Habitat');
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(() => pendingJoin('user') ?? '');
   const [name, setName] = useState(() => signedInAccount()?.name ?? '');
   const [animal, setAnimal] = useState(ANIMALS[0]);
   const [busy, setBusy] = useState(false);

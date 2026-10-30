@@ -159,3 +159,36 @@ export const revokeDevice = (userToken: string, deviceId: string) =>
   call<void>(`/api/devices/${deviceId}`, { method: 'DELETE', bearer: userToken });
 
 export const getMe = (c: Connection) => call<MeResponse>('/api/me', { bearer: c.deviceToken });
+
+// ---- Managing devices (users only: these take a signed-in user's Entra token) ----
+
+export type PairingKind = 'device' | 'user';
+
+export interface PairingCode {
+  code: string;
+  kind: PairingKind;
+  /** ISO time; codes last about ten minutes and work once. */
+  expiresAt: string;
+  /** Where the code takes someone, e.g. "/join#K7QP-M3XD". The code is after '#' so it never reaches server logs. */
+  joinPath: string;
+}
+
+export interface HabitatDevice {
+  id: string;
+  name: string;
+  status: DeviceStatus;
+  createdAt: string;
+  lastSeenAt: string;
+  signedInByUser: boolean;
+  /** Set when this device belongs to someone asking to join as a user, e.g. "🦊 Sam". Approving it approves them too. */
+  joiningAsUser: string | null;
+}
+
+export async function createPairingCode(userToken: string, kind: PairingKind): Promise<PairingCode> {
+  const c = await call<Omit<PairingCode, 'kind'> & { kind: string }>('/api/pairing-codes', { method: 'POST', bearer: userToken, body: { kind: kind === 'user' ? 'User' : 'Device' } });
+  return { ...c, kind: c.kind === 'User' ? 'user' : 'device' };
+}
+
+export const listDevices = (userToken: string) => call<HabitatDevice[]>('/api/devices', { bearer: userToken });
+
+export const approveDevice = (userToken: string, deviceId: string) => call<void>(`/api/devices/${deviceId}/approve`, { method: 'POST', bearer: userToken });
