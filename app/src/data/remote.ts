@@ -1,6 +1,9 @@
 import { useSyncExternalStore } from 'react';
 import { ENERGY_ORDER, IMPACT_ORDER, SOUND_ORDER, TIER_ORDER, type Member, type Room, type Tend, type TendKind, type TendStatus, type Win } from '../domain/types';
-import { ApiError, call, forgetConnection, type Connection } from './api';
+import { ApiError, call, forgetConnection, isWaking, type Connection } from './api';
+
+/** How soon to try pulling again while the habitat wakes up. */
+const WAKE_RETRY_MS = 6_000;
 import { db } from './db';
 
 /*
@@ -311,6 +314,8 @@ export function syncNow(): Promise<void> {
     } catch (e) {
       if (signedOut(e)) return;
       if (e instanceof ApiError && e.status === 0) setStatus({ ...status, online: false });
+      // Still waking up after a quiet spell: not a problem worth a banner; try again shortly.
+      else if (isWaking(e)) setTimeout(() => void syncNow(), WAKE_RETRY_MS);
       else setStatus({ ...status, problem: `Couldn’t update from the habitat: ${e instanceof Error ? e.message : 'something went wrong'}` });
     }
   });

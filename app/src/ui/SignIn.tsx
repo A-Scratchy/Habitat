@@ -9,6 +9,7 @@ import {
   pairDevice,
   saveConnection,
   signInDevice,
+  whileWaking,
   type Connection,
 } from '../data/api';
 import { startDemo } from '../data/example';
@@ -73,7 +74,8 @@ export function SignIn({ pending, onConnected }: { pending?: Connection; onConne
       const token = await silentUserToken();
       if (!token) return signIn();
       try {
-        const c = await signInDevice(token);
+        // After a quiet spell the server takes a moment to wake; keep trying rather than give up.
+        const c = await whileWaking(() => signInDevice(token));
         if (!cancelled) connected(c);
       } catch (e) {
         if (cancelled) return;

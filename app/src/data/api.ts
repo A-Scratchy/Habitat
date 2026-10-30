@@ -71,6 +71,27 @@ export async function call<T>(path: string, init: { method?: string; body?: unkn
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
+/** The server is starting up or its database is waking (a quiet spell), rather than anything being wrong. */
+export const isWaking = (e: unknown) => e instanceof ApiError && (e.status === 0 || e.status >= 500);
+
+const WAKE_RETRIES = 8;
+const WAKE_RETRY_MS = 6_000;
+
+/**
+ * Runs a request again while the habitat wakes up (about a minute at most), then gives up with the
+ * last error. Only for requests that are safe to repeat.
+ */
+export async function whileWaking<T>(run: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (e) {
+      if (!isWaking(e) || attempt >= WAKE_RETRIES) throw e;
+      await new Promise((r) => setTimeout(r, WAKE_RETRY_MS));
+    }
+  }
+}
+
 /**
  * This device's place in a habitat. A device joined with a code is "pending" until a user approves it.
  * memberId/name/animal are set when a user signed in, so the app knows who they are straight away.

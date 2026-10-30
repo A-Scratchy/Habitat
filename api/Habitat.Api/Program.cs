@@ -19,8 +19,9 @@ var config = builder.Configuration;
 
 builder.Services.AddDbContext<HabitatDb>(o => o.UseSqlServer(
     config.GetConnectionString("Habitat"),
-    // The free Azure SQL tier pauses when idle; retry while it resumes.
-    sql => sql.EnableRetryOnFailure()));
+    // The free Azure SQL tier pauses after an hour idle and takes up to about a minute to resume.
+    // Keep retrying for that long (roughly 90 seconds in all) rather than failing the first request.
+    sql => sql.EnableRetryOnFailure(maxRetryCount: 12, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null)));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHabitatAuth(config);
 builder.Services.AddValidation();

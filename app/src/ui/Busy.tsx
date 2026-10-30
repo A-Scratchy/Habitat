@@ -3,8 +3,10 @@ import { entraConfigured, signedInAccount, signOut } from '../auth/entra';
 import { forgetConnection, readConnection } from '../data/api';
 import { ConfirmButton } from './Confirm';
 
-/** How long before a waiting screen admits it's slow and offers ways out. */
-const PATIENCE_MS = 6000;
+/** After this, a waiting screen explains that the habitat is probably waking up. */
+const PATIENCE_MS = 5_000;
+/** Waking takes about a minute at most; after this, offer ways out too. */
+const STUCK_MS = 90_000;
 
 /** Where this device stands, in one line, so nobody has to guess whether they're signed in. */
 export function SignInStatus({ waitingForApproval = false }: { waitingForApproval?: boolean }) {
@@ -39,12 +41,16 @@ export function SignInStatus({ waitingForApproval = false }: { waitingForApprova
  * it explains and offers Try again, plus Sign out / Disconnect so there's always a way out.
  */
 export function BusyScreen({ message, error }: { message: string; error?: string }) {
-  const [slow, setSlow] = useState(false);
+  const [waited, setWaited] = useState<'no' | 'slow' | 'long'>('no');
   useEffect(() => {
-    const t = setTimeout(() => setSlow(true), PATIENCE_MS);
-    return () => clearTimeout(t);
+    const slow = setTimeout(() => setWaited('slow'), PATIENCE_MS);
+    const long = setTimeout(() => setWaited('long'), STUCK_MS);
+    return () => {
+      clearTimeout(slow);
+      clearTimeout(long);
+    };
   }, []);
-  const stuck = slow || !!error;
+  const stuck = waited === 'long' || !!error;
 
   return (
     <section className="screen narrow welcome" aria-busy={!stuck}>
@@ -53,9 +59,12 @@ export function BusyScreen({ message, error }: { message: string; error?: string
       </div>
       <p aria-live="polite">{error ?? message}</p>
       <SignInStatus />
+      {waited === 'slow' && !error && (
+        <p className="muted small waking">🌙 Waking the habitat up. After a quiet spell this can take up to a minute; it carries on by itself.</p>
+      )}
       {stuck && (
         <div className="stack">
-          {!error && <p className="muted small">This is taking longer than usual. The Habitat server might be waking up, or you might be offline.</p>}
+          {!error && <p className="muted small">This is taking much longer than usual. You might be offline, or the Habitat server might be having trouble.</p>}
           <button className="btn-done wide" onClick={() => window.location.reload()}>
             Try again
           </button>
