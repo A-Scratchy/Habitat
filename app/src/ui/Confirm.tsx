@@ -21,12 +21,24 @@ export function ConfirmButton({
 }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
 
   if (!asking) {
     return (
-      <button type="button" className={className} disabled={disabled} onClick={() => setAsking(true)}>
-        {children}
-      </button>
+      <>
+        <button
+          type="button"
+          className={className}
+          disabled={disabled}
+          onClick={() => {
+            setError(undefined);
+            setAsking(true);
+          }}
+        >
+          {children}
+        </button>
+        {error && <p className="small error-text">{error}</p>}
+      </>
     );
   }
 
@@ -40,6 +52,9 @@ export function ConfirmButton({
         setBusy(true);
         try {
           await onConfirm();
+        } catch (e) {
+          // Never fail silently: say what went wrong next to the button.
+          setError(e instanceof Error ? e.message : 'That didn’t work. Please try again.');
         } finally {
           setBusy(false);
           setAsking(false);

@@ -1,4 +1,4 @@
-import { InteractionRequiredAuthError, PublicClientApplication, type AccountInfo, type AuthenticationResult } from '@azure/msal-browser';
+import { BrowserAuthError, BrowserAuthErrorCodes, PublicClientApplication, type AccountInfo, type AuthenticationResult } from '@azure/msal-browser';
 import { forgetConnection, readConnection, revokeDevice } from '../data/api';
 
 const env = import.meta.env;
@@ -73,9 +73,15 @@ export async function silentUserToken(): Promise<string | undefined> {
   }
 }
 
+/** Failures that mean this device simply can't reach the sign-in service right now; going there wouldn't help. */
+const offline = (e: unknown) => e instanceof BrowserAuthError && e.errorCode === BrowserAuthErrorCodes.noNetworkConnectivity;
+
 /**
  * An Entra access token for calls only users may make (pairing, approving, revoking).
- * Usually silent; if the session has lapsed it redirects to sign in and this never resolves.
+ * Usually silent. A browser's sign-in can only renew itself quietly for about a day; after that the
+ * library tries a hidden page that most browsers now block (it fails with "timed_out"), and the
+ * sign-in may need the person anyway. In every such case it goes to the sign-in page and back,
+ * which is usually instant while the Habitat sign-in session lasts, and this never resolves.
  */
 export async function userToken(): Promise<string> {
   const account = signedInAccount();
@@ -86,7 +92,7 @@ export async function userToken(): Promise<string> {
   try {
     return (await msal!.acquireTokenSilent({ scopes: [apiScope], account })).accessToken;
   } catch (e) {
-    if (!(e instanceof InteractionRequiredAuthError)) throw e;
+    if (offline(e)) throw new Error('Can’t reach the sign-in service. Check your connection and try again.');
     await msal!.acquireTokenRedirect({ scopes: [apiScope], account });
     return new Promise(() => {});
   }
