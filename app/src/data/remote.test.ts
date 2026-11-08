@@ -86,8 +86,9 @@ describe('server shapes', () => {
   });
 
   it('wins: the first member did it, the rest helped', () => {
-    const w = winFromServer({ id: 'w', tendId: 'h1', tendName: 'Wipe sink', roomId: 'kitchen', roomName: 'Kitchen', at: '2026-10-27T08:00:00Z', memberIds: ['robin', 'sam'], deletedAt: null });
-    expect(w).toEqual({ id: 'w', tendId: 'h1', tendName: 'Wipe sink', roomId: 'kitchen', room: 'Kitchen', memberId: 'robin', helperIds: ['sam'], at: Date.parse('2026-10-27T08:00:00Z') });
+    const w = winFromServer({ id: 'w', tendId: 'h1', tendName: 'Wipe sink', roomId: 'kitchen', roomName: 'Kitchen', tier: 'Bee', at: '2026-10-27T08:00:00Z', memberIds: ['robin', 'sam'], deletedAt: null });
+    expect(() => winFromServer({ id: 'w', tendId: 'h1', tendName: 'x', roomId: null, roomName: null, tier: 'Giraffe', at: '2026-10-27T08:00:00Z', memberIds: ['robin'], deletedAt: null })).toThrow();
+    expect(w).toEqual({ id: 'w', tendId: 'h1', tendName: 'Wipe sink', roomId: 'kitchen', room: 'Kitchen', tier: 'bee', memberId: 'robin', helperIds: ['sam'], at: Date.parse('2026-10-27T08:00:00Z') });
   });
 
   it('members keep their chosen sound, and an unknown one is refused', () => {

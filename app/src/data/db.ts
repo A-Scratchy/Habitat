@@ -97,6 +97,29 @@ function open(name: string): HabitatDexie {
           m.sound ??= DEFAULT_SOUND;
         }),
     );
+  // Wins remember the effort tier they were done at, for reports. Older wins take their habit or
+  // quest's tier; a win whose tend is gone can't be known, so it's dropped (a connected habitat
+  // sends it again, tier and all, from the server).
+  d.version(7)
+    .stores({
+      rooms: 'id, name',
+      tends: 'id, kind, status, roomId',
+      members: 'id',
+      wins: 'id, at',
+      meta: 'key',
+    })
+    .upgrade(async (tx) => {
+      const tierOf = new Map((await tx.table('tends').toArray()).map((t: Tend) => [t.id, t.tier]));
+      await tx
+        .table('wins')
+        .toCollection()
+        .modify((w: Record<string, unknown>, ref: { value?: unknown }) => {
+          if (w.tier) return;
+          const tier = tierOf.get(w.tendId as string);
+          if (tier) w.tier = tier;
+          else delete ref.value;
+        });
+    });
   return d;
 }
 

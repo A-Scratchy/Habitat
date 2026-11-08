@@ -104,6 +104,8 @@ export interface Win {
   roomId?: string;
   /** The room's name when it was done, so the feed still reads right after a rename. */
   room?: string;
+  /** The tend's effort tier when it was done, so reports don't change if it's re-tiered or removed. */
+  tier: EffortTier;
   memberId: string;
   /** Others tagged as having helped. */
   helperIds?: string[];

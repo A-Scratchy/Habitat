@@ -3,8 +3,10 @@ import type { Member, Room, Tend, Win } from './types';
 
 /**
  * Gives scheduled tends plausible last-done dates (anywhere from just done to well overdue)
- * and back-fills a Win for everything done in the last week, so every screen has something to show.
+ * and back-fills Wins going back about six months, so every screen (reports included) has something to show.
  */
+const HISTORY_DAYS = 180;
+
 export function mockHistory(
   tends: Tend[],
   rooms: Room[],
@@ -25,10 +27,14 @@ export function mockHistory(
       daysAgo === 0
         ? wake + rnd() * (now - wake)
         : Math.min(now, today - daysAgo * DAY + (8 + rnd() * 13) * HOUR);
-    if (daysAgo <= 6 && members.length) {
+    if (members.length) {
       const owner = members.find((m) => m.id === t.ownerId);
-      const member = owner ?? members[Math.floor(rnd() * members.length)];
-      wins.push({ id: newId(), tendId: t.id, tendName: t.name, ...(t.roomId && { roomId: t.roomId, room: roomName.get(t.roomId) }), memberId: member.id, at });
+      const room = t.roomId ? { roomId: t.roomId, room: roomName.get(t.roomId) } : {};
+      // The last one, then earlier ones about every so often, so reports have months to show.
+      for (let when = at; when >= now - HISTORY_DAYS * DAY; when -= t.frequencyDays * DAY * (0.7 + rnd() * 0.9)) {
+        const member = owner ?? members[Math.floor(rnd() * members.length)];
+        wins.push({ id: newId(), tendId: t.id, tendName: t.name, ...room, tier: t.tier, memberId: member.id, at: Math.round(when) });
+      }
     }
     return { ...t, lastDone: at };
   });

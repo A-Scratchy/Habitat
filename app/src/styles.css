@@ -1094,3 +1094,152 @@ select {
   letter-spacing: 0.12em;
   font-variant-numeric: tabular-nums;
 }
+
+/* Report */
+.rpt-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.rpt-hero strong {
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
+.rpt-chart {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rpt-chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rpt-bars {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 140px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rpt-bar {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.rpt-bar.picked {
+  background: var(--surface-2);
+}
+
+.rpt-bar-track {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-top: 6px;
+}
+
+.rpt-bar-fill {
+  display: block;
+  width: min(100%, 28px);
+  min-height: 3px;
+  border-radius: 4px 4px 0 0;
+  background: var(--done-bg);
+  opacity: 0.45;
+}
+
+.rpt-bar.current .rpt-bar-fill,
+.rpt-bar.picked .rpt-bar-fill {
+  opacity: 1;
+}
+
+.rpt-bar-label {
+  height: 18px;
+  line-height: 18px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.rpt-bar.current .rpt-bar-label {
+  color: var(--ink);
+}
+
+.rpt-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rpt-meter-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rpt-meter.strong .rpt-meter-top > span:first-child {
+  font-weight: 700;
+}
+
+.rpt-meter-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.rpt-meter-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--done-bg);
+}
+
+.rpt-quiet {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* The bars area is 140px: a 22px label row (18px + 4px gap), then 6px headroom over 112px of bar. */
+.rpt-guide {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--muted);
+  pointer-events: none;
+}
+
+.rpt-guide span {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  font-size: 0.7rem;
+  color: var(--muted);
+  background: var(--surface);
+  padding: 0 4px;
+  border-radius: 4px;
+}

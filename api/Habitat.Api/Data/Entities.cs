@@ -24,6 +24,8 @@ public class Household
     /// <summary>IANA zone, e.g. Europe/London. Defines when "today" starts for claims.</summary>
     public required string TimeZoneId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    /// <summary>The member who started the habitat. They see the "share of the load" report, and can't be removed.</summary>
+    public Guid OwnerMemberId { get; set; }
 }
 
 /// <summary>Everyone who is part of a habitat: a name and an animal. Some members are also users.</summary>
@@ -212,6 +214,8 @@ public class Win : HouseholdEntity, ISynced
     /// <summary>Null for a quest done out and about, with no room.</summary>
     public Guid? RoomId { get; set; }
     public string? RoomName { get; set; }
+    /// <summary>The tend's effort tier when it was done, so reports don't change if it's re-tiered or removed.</summary>
+    public EffortTier Tier { get; set; }
     /// <summary>When it was done; may be backdated.</summary>
     public DateTimeOffset At { get; set; }
     /// <summary>When it was recorded.</summary>

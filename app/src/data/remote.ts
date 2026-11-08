@@ -106,6 +106,7 @@ interface SyncWin {
   tendName: string;
   roomId: string | null;
   roomName: string | null;
+  tier: string;
   at: string;
   /** Primary first. */
   memberIds: string[];
@@ -115,6 +116,8 @@ interface SyncWin {
 interface SyncResponse {
   cursor: string;
   full: boolean;
+  /** Who started the habitat. */
+  ownerMemberId: string;
   rooms: SyncRoom[];
   members: SyncMember[];
   tends: SyncTend[];
@@ -183,6 +186,7 @@ export function winFromServer(w: SyncWin): Win {
     tendName: w.tendName,
     ...(w.roomId && { roomId: w.roomId }),
     ...(w.roomName && { room: w.roomName }),
+    tier: fromServer(w.tier, TIER_ORDER),
     memberId,
     ...(helperIds.length && { helperIds }),
     at: ms(w.at)!,
@@ -299,6 +303,7 @@ async function pull(): Promise<void> {
     await target.tends.bulkPut(kept(r.tends).map(tendFromServer));
     await target.wins.bulkDelete(removed(r.wins));
     await target.wins.bulkPut(kept(r.wins).map(winFromServer));
+    await target.meta.put({ key: 'owner', value: r.ownerMemberId });
     await target.meta.put({ key: 'cursor', value: r.cursor });
   });
 }

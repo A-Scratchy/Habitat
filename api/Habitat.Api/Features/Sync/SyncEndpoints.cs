@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Habitat.Api.Auth;
 using Habitat.Api.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -16,18 +17,19 @@ public record SyncTend(
     Guid? OwnerMemberId, bool? OpenToEveryone, Guid[] AvailableTo, Guid? ClaimMemberId, DateOnly? ClaimDay, DateTimeOffset? LastDoneAt, DateTimeOffset UpdatedAt, DateTimeOffset? DeletedAt);
 
 /// <summary>MemberIds: primary first.</summary>
-public record SyncWin(Guid Id, Guid TendId, string TendName, Guid? RoomId, string? RoomName, DateTimeOffset At, Guid[] MemberIds, DateTimeOffset? DeletedAt);
+public record SyncWin(Guid Id, Guid TendId, string TendName, Guid? RoomId, string? RoomName, EffortTier Tier, DateTimeOffset At, Guid[] MemberIds, DateTimeOffset? DeletedAt);
 
 /// <summary>
 /// Cursor: pass back as <c>since</c> next time. It's a string because rowversions can outgrow JavaScript numbers.
 /// Full: true for a first sync (since=0), which skips removed rows and only includes recent wins.
+/// OwnerMemberId: who started the habitat; always sent, since it isn't a synced row.
 /// </summary>
-public record SyncResponse(string Cursor, bool Full, SyncRoom[] Rooms, SyncMember[] Members, SyncTend[] Tends, SyncWin[] Wins);
+public record SyncResponse(string Cursor, bool Full, Guid OwnerMemberId, SyncRoom[] Rooms, SyncMember[] Members, SyncTend[] Tends, SyncWin[] Wins);
 
 public static class SyncEndpoints
 {
-    /// <summary>A new device only needs recent wins: habits and quests carry their own last-done dates.</summary>
-    public static readonly TimeSpan FirstSyncWinHistory = TimeSpan.FromDays(35);
+    /// <summary>A new device only needs recent wins (habits and quests carry their own last-done dates), but enough for six months of reports.</summary>
+    public static readonly TimeSpan FirstSyncWinHistory = TimeSpan.FromDays(190);
 
     public static void MapSyncEndpoints(this IEndpointRouteBuilder api)
     {
@@ -36,7 +38,7 @@ public static class SyncEndpoints
             .WithSummary("Everything in the habitat that changed since the cursor, including removals.");
     }
 
-    private static async Task<Results<Ok<SyncResponse>, ValidationProblem>> Get(string? since, HabitatDb db, TimeProvider clock)
+    private static async Task<Results<Ok<SyncResponse>, ValidationProblem>> Get(string? since, ClaimsPrincipal principal, HabitatDb db, TimeProvider clock)
     {
         if (!long.TryParse(since ?? "0", out var from) || from < 0)
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["since"] = ["A cursor from a previous sync, or 0."] });
@@ -68,12 +70,14 @@ public static class SyncEndpoints
         var wins = await db.Wins
             .Where(w => w.RowVersion > from && w.RowVersion < upper && (!full || (w.DeletedAt == null && w.At >= winsSince)))
             .Select(w => new SyncWin(
-                w.Id, w.TendId, w.TendName, w.RoomId, w.RoomName, w.At,
+                w.Id, w.TendId, w.TendName, w.RoomId, w.RoomName, w.Tier, w.At,
                 w.Members.OrderByDescending(m => m.IsPrimary).Select(m => m.MemberId).ToArray(),
                 w.DeletedAt))
             .ToArrayAsync();
 
+        var householdId = principal.HouseholdId();
+        var owner = await db.Households.Where(h => h.Id == householdId).Select(h => h.OwnerMemberId).FirstAsync();
         var cursor = Math.Max(from, upper - 1);
-        return TypedResults.Ok(new SyncResponse(cursor.ToString(), full, rooms, members, tends, wins));
+        return TypedResults.Ok(new SyncResponse(cursor.ToString(), full, owner, rooms, members, tends, wins));
     }
 }

@@ -219,7 +219,7 @@ describe('selection', () => {
   });
 
   it('team summary has no per-person counts', () => {
-    const w = (memberId: string, room: string, at: number): Win => ({ id: `${at}`, tendId: 'x', tendName: 'x', roomId: room.toLowerCase(), room, memberId, at });
+    const w = (memberId: string, room: string, at: number): Win => ({ id: `${at}`, tendId: 'x', tendName: 'x', roomId: room.toLowerCase(), room, tier: 'bee', memberId, at });
     const wins = [w('a', 'Kitchen', NOW - 1000), w('b', 'Kitchen', NOW - 2000), w('a', 'Garden', daysAgo(3)), w('c', 'Garden', daysAgo(30))];
     expect(weekSummary(wins, NOW)).toEqual({ total: 3, helpers: 2, rooms: [['Kitchen', 2], ['Garden', 1]] });
     wins[0].helperIds = ['d'];
@@ -395,19 +395,23 @@ describe('room health', () => {
   });
 
   it('pack totals count today, yesterday and this week, for the team', () => {
-    const w = (at: number): Win => ({ id: `${at}`, tendId: 'x', tendName: 'x', roomId: 'k', room: 'Kitchen', memberId: 'a', at });
+    const w = (at: number): Win => ({ id: `${at}`, tendId: 'x', tendName: 'x', roomId: 'k', room: 'Kitchen', tier: 'bee', memberId: 'a', at });
     expect(packTotals([w(NOW - 1000), w(NOW - 2000), w(daysAgo(1)), w(daysAgo(10))], NOW)).toEqual({ today: 2, yesterday: 1, week: 3 });
   });
 });
 
 describe('mock history', () => {
-  it('only dates active habits, never in the future, with wins for the last week', () => {
+  it('only dates active habits, never in the future, with wins going back months', () => {
     let n = 0;
     const tends = [habit({ frequencyDays: 7 }), quest(), habit({ frequencyDays: 365 })];
     const members = [{ id: 'm', name: 'Alex', animal: '🦊', sound: 'chime' as const }];
     const out = mockHistory(tends, [], members, NOW, () => `w${++n}`, () => 0.2);
     expect(out.tends[1].lastDone).toBeUndefined();
     expect(out.tends.every((t) => t.lastDone == null || t.lastDone <= NOW)).toBe(true);
-    expect(out.wins.map((w) => w.tendId)).toEqual([tends[0].id]);
+    // Weekly: a win roughly every week for six months. Yearly: just the one, since it was done this year.
+    const weekly = out.wins.filter((w) => w.tendId === tends[0].id);
+    expect(weekly.length).toBeGreaterThan(15);
+    expect(weekly.every((w) => w.at <= NOW && w.at >= NOW - 181 * DAY && w.tier === tends[0].tier)).toBe(true);
+    expect(out.wins.some((w) => w.tendId === tends[1].id)).toBe(false);
   });
 });

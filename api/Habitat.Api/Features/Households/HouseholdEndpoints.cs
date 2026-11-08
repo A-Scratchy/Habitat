@@ -77,8 +77,9 @@ public static class HouseholdEndpoints
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { [nameof(req.TimeZoneId)] = ["Unknown time zone."] });
 
         var now = clock.GetUtcNow();
-        var household = new Household { Id = Guid.CreateVersion7(), Name = req.HouseholdName.Trim(), TimeZoneId = zone, CreatedAt = now };
-        var member = new Member { Id = Guid.CreateVersion7(), HouseholdId = household.Id, Name = req.MemberName.Trim(), Animal = req.Animal, UpdatedAt = now };
+        var member = new Member { Id = Guid.CreateVersion7(), Name = req.MemberName.Trim(), Animal = req.Animal, UpdatedAt = now };
+        var household = new Household { Id = Guid.CreateVersion7(), Name = req.HouseholdName.Trim(), TimeZoneId = zone, CreatedAt = now, OwnerMemberId = member.Id };
+        member.HouseholdId = household.Id;
         var user = NewUser(household.Id, member.Id, principal, now, approved: true);
         var (device, token) = DeviceEndpoints.NewDevice(household.Id, req.DeviceName, now, approved: true, userId: user.Id);
         db.AddRange(household, member, user, device);

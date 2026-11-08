@@ -10,6 +10,7 @@ import { useHabitat } from './habitat';
 import { loadExample } from '../data/example';
 import { MeadowSetting } from '../meadow/MeadowSetting';
 import { isRemote } from '../data/remote';
+import { Report } from './Report';
 
 function MembersAdmin() {
   const { members, me, setMe } = useHabitat();
@@ -173,13 +174,14 @@ function DataAdmin() {
   );
 }
 
-export type SettingsTab = 'pack' | 'devices' | 'data' | 'account';
+export type SettingsTab = 'pack' | 'report' | 'devices' | 'data' | 'account';
 
 export function Settings({ initialTab }: { initialTab?: SettingsTab }) {
   const [tab, setTab] = useState<SettingsTab>(initialTab ?? 'pack');
   // Devices only exist for a habitat on the server (not the demo or a local-only one).
   const tabs: [SettingsTab, string][] = [
     ['pack', '🐾 The pack'],
+    ['report', '📊 Report'],
     ...(isRemote() ? ([['devices', '📱 Devices']] as [SettingsTab, string][]) : []),
     ['data', '📦 Import & export'],
     ['account', '☁️ Household account'],
@@ -197,6 +199,7 @@ export function Settings({ initialTab }: { initialTab?: SettingsTab }) {
         ))}
       </div>
       {tab === 'pack' && <MembersAdmin />}
+      {tab === 'report' && <Report />}
       {tab === 'devices' && <DevicesAdmin />}
       {tab === 'data' && <DataAdmin />}
       {tab === 'account' && <AccountAdmin />}

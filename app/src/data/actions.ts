@@ -35,7 +35,7 @@ export async function completeTends(tendIds: string[], memberIds: string[], at =
       if (!tend) continue;
       const finishesQuest = tend.kind === 'quest' && tend.completedAt == null;
       const room = tend.roomId ? (await db.rooms.get(tend.roomId))?.name : undefined;
-      const win: Win = { id: winIds.get(tend.id)!, tendId: tend.id, tendName: tend.name, ...(tend.roomId && { roomId: tend.roomId, room }), memberId, at, prevLastDone: tend.lastDone };
+      const win: Win = { id: winIds.get(tend.id)!, tendId: tend.id, tendName: tend.name, ...(tend.roomId && { roomId: tend.roomId, room }), tier: tend.tier, memberId, at, prevLastDone: tend.lastDone };
       if (helperIds.length) win.helperIds = helperIds;
       if (finishesQuest) win.completedQuest = true;
       await db.wins.put(win);

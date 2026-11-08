@@ -20,6 +20,8 @@ export interface Habitat {
   /** Wins since the start of this week (and at least since yesterday). */
   wins: Win[];
   me?: Member;
+  /** Who started the habitat, once a connected habitat has synced; none for the demo or a local-only one. */
+  ownerId?: string;
   ctx: ViewContext;
   memberById: Map<string, Member>;
   setMe(id: string | undefined): void;
@@ -65,6 +67,8 @@ export function HabitatProvider({ children, loading }: { children: (state: 'load
   const rooms = useLiveQuery(() => db.rooms.toArray(), []);
   const tends = useLiveQuery(() => db.tends.toArray(), []);
   const members = useLiveQuery(() => db.members.toArray(), []);
+  // Wrapped, so "not synced yet" (undefined) is told apart from "still loading".
+  const owner = useLiveQuery(async () => ({ id: (await db.meta.get('owner'))?.value }), []);
   const wins = useLiveQuery(() => db.wins.where('at').aboveOrEqual(since).toArray(), [since]);
   const [meId, setMeId] = useState(() => readLocal('eco.member'));
   const [toast, setToast] = useState<Toast>();
@@ -107,7 +111,7 @@ export function HabitatProvider({ children, loading }: { children: (state: 'load
   );
 
   const value = useMemo<Habitat | null>(() => {
-    if (!rooms || !tends || !members || !wins) return null;
+    if (!rooms || !tends || !members || !wins || !owner) return null;
     const memberById = new Map(members.map((m) => [m.id, m]));
     const roomById = new Map(rooms.map((r) => [r.id, r]));
     const me = meId ? memberById.get(meId) : undefined;
@@ -119,12 +123,13 @@ export function HabitatProvider({ children, loading }: { children: (state: 'load
       members,
       wins,
       me,
+      ...(owner.id && { ownerId: owner.id }),
       ctx: { now, memberId: me?.id },
       memberById,
       setMe,
       complete,
     };
-  }, [rooms, tends, members, wins, meId, now, setMe, complete]);
+  }, [rooms, tends, members, wins, owner, meId, now, setMe, complete]);
 
   if (!value) return <>{loading}</>;
   const state = value.tends.length === 0 && value.members.length === 0 ? 'empty' : 'ready';

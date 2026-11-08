@@ -235,6 +235,23 @@ public class TendWinSyncTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task Wins_keep_the_effort_tier_they_were_done_at()
+    {
+        var (_, device, robin, habitId) = await Setup();
+        var winId = Guid.NewGuid();
+        (await LogWin(device, habitId, [robin], winId: winId)).EnsureSuccessStatusCode();
+
+        // Re-tiering the habit later doesn't rewrite what that win was worth.
+        (await device.PatchAsJsonAsync($"/api/tends/{habitId}", new { tier = "Elephant" }, Json.Options)).EnsureSuccessStatusCode();
+        var later = Guid.NewGuid();
+        (await LogWin(device, habitId, [robin], winId: later)).EnsureSuccessStatusCode();
+
+        var wins = (await Sync(device)).Wins;
+        Assert.Equal(EffortTier.Tortoise, wins.Single(w => w.Id == winId).Tier);
+        Assert.Equal(EffortTier.Elephant, wins.Single(w => w.Id == later).Tier);
+    }
+
+    [Fact]
     public async Task Wins_are_checked()
     {
         var (_, device, robin, habitId) = await Setup();

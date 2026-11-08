@@ -58,6 +58,8 @@ public static class MemberEndpoints
         var callerId = principal.UserId();
         if (await db.Users.AnyAsync(u => u.Id == callerId && u.MemberId == id))
             return TypedResults.Problem("You can't remove yourself.", statusCode: StatusCodes.Status409Conflict);
+        if (await db.Households.AnyAsync(h => h.Id == member.HouseholdId && h.OwnerMemberId == id))
+            return TypedResults.Problem("The person who started the habitat can't be removed.", statusCode: StatusCodes.Status409Conflict);
 
         var now = clock.GetUtcNow();
         member.DeletedAt = now;

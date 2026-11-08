@@ -112,6 +112,23 @@ public class HouseholdTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task Whoever_starts_the_habitat_owns_it_and_cannot_be_removed()
+    {
+        var (robin, session) = await api.NewHousehold();
+        var sync = await api.Client(session.DeviceToken).GetFromJsonAsync<Habitat.Api.Features.Sync.SyncResponse>("/api/sync?since=0", Json.Options);
+        Assert.Equal(session.MemberId, sync!.OwnerMemberId);
+
+        var sam = NewPerson();
+        var joined = await (await api.Client(sam).PostAsJsonAsync("/api/auth/join", new JoinRequest((await api.NewCode(robin, PairingKind.User)).Code, "Phone", MemberName: "Sam", Animal: "🦉")))
+            .Content.ReadFromJsonAsync<SessionResponse>(Json.Options);
+        (await api.Client(robin).PostAsync($"/api/devices/{joined!.DeviceId}/approve", null)).EnsureSuccessStatusCode();
+
+        // Another user can manage the pack, but not remove the owner.
+        Assert.Equal(HttpStatusCode.Conflict, (await api.Client(sam).DeleteAsync($"/api/members/{session.MemberId}")).StatusCode);
+        Assert.Equal(session.MemberId, (await api.Client(joined.DeviceToken).GetFromJsonAsync<Habitat.Api.Features.Sync.SyncResponse>("/api/sync?since=0", Json.Options))!.OwnerMemberId);
+    }
+
+    [Fact]
     public async Task Invited_user_can_manage_the_habitat_only_once_approved()
     {
         var (robin, _) = await api.NewHousehold();

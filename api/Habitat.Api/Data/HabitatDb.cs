@@ -103,6 +103,7 @@ public class HabitatDb(DbContextOptions<HabitatDb> options, ICurrentHousehold? c
         {
             e.Property(x => x.TendName).HasMaxLength(80);
             e.Property(x => x.RoomName).HasMaxLength(40);
+            e.Property(x => x.Tier).HasConversion<string>().HasMaxLength(16);
             e.HasIndex(x => new { x.TendId, x.At });
             e.OwnsMany(x => x.Members, m =>
             {

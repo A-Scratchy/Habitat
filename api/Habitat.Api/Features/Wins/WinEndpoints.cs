@@ -57,6 +57,7 @@ public static class WinEndpoints
             TendName = tend.Name,
             RoomId = tend.RoomId,
             RoomName = roomName,
+            Tier = tend.Tier,
             At = input.At,
             LoggedAt = now,
             LoggedByDeviceId = principal.DeviceId(),
