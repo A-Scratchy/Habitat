@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { ENERGY_ORDER, IMPACT_ORDER, SOUND_ORDER, TIER_ORDER, type Member, type Room, type Tend, type TendKind, type TendStatus, type Win } from '../domain/types';
+import { ENERGY_ORDER, IMPACT_ORDER, SOUND_ORDER, TIER_ORDER, type HabitSchedule, type Member, type Room, type Tend, type TendKind, type TendStatus, type Win } from '../domain/types';
 import { ApiError, call, forgetConnection, isWaking, type Connection } from './api';
 
 /** How soon to try pulling again while the habitat wakes up. */
@@ -87,6 +87,7 @@ interface SyncTend {
   tier: string;
   impact: string;
   energy: string[];
+  schedule: string | null;
   frequencyDays: number | null;
   status: string;
   completedAt: string | null;
@@ -122,6 +123,7 @@ interface SyncResponse {
 
 const KIND_ORDER: TendKind[] = ['habit', 'quest'];
 const STATUS_ORDER: TendStatus[] = ['active', 'paused'];
+const SCHEDULE_ORDER: HabitSchedule[] = ['every', 'whenNeeded'];
 
 const toServer = (value: string) => value[0].toUpperCase() + value.slice(1);
 
@@ -157,8 +159,11 @@ export function tendFromServer(t: SyncTend): Tend {
     ...(t.claimMemberId && t.claimDay && { claim: { memberId: t.claimMemberId, day: t.claimDay } }),
   };
   if (fromServer(t.kind, KIND_ORDER) === 'habit') {
-    if (!t.roomId || t.frequencyDays == null) throw new Error(`The habit “${t.name}” came from the server without a room or schedule.`);
-    return { ...common, kind: 'habit', roomId: t.roomId, frequencyDays: t.frequencyDays, ...(t.ownerMemberId && { ownerId: t.ownerMemberId }) };
+    if (!t.roomId || !t.schedule) throw new Error(`The habit “${t.name}” came from the server without a room or schedule.`);
+    const habit = { ...common, kind: 'habit' as const, roomId: t.roomId, ...(t.ownerMemberId && { ownerId: t.ownerMemberId }) };
+    if (fromServer(t.schedule, SCHEDULE_ORDER) === 'whenNeeded') return { ...habit, schedule: 'whenNeeded' };
+    if (t.frequencyDays == null) throw new Error(`The habit “${t.name}” came from the server without how often it comes back.`);
+    return { ...habit, schedule: 'every', frequencyDays: t.frequencyDays };
   }
   if (t.openToEveryone == null) throw new Error(`The quest “${t.name}” came from the server without saying who can take it on.`);
   return {
@@ -195,7 +200,8 @@ export function tendToServer(t: Tend) {
     tier: toServer(t.tier),
     impact: toServer(t.impact),
     energy: t.energy.map(toServer),
-    frequencyDays: t.kind === 'habit' ? t.frequencyDays : null,
+    schedule: t.kind === 'habit' ? toServer(t.schedule) : null,
+    frequencyDays: t.kind === 'habit' && t.schedule === 'every' ? t.frequencyDays : null,
     status: toServer(t.status),
     ownerMemberId: t.kind === 'habit' ? (t.ownerId ?? null) : null,
     seedLastDoneAt: iso(t.lastDone),
@@ -214,6 +220,7 @@ const PATCH_FIELDS: Record<string, { name: string; value?: (v: never) => unknown
   impact: { name: 'impact', value: toServer },
   status: { name: 'status', value: toServer },
   energy: { name: 'energy', value: (e: string[]) => e.map(toServer) },
+  schedule: { name: 'schedule', value: toServer },
   frequencyDays: { name: 'frequencyDays' },
 };
 

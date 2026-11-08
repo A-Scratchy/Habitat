@@ -46,8 +46,9 @@ interface Form {
   ownerId: string;
   /** Quests only. Empty until chosen: who can take it on is never assumed. */
   availableTo: 'everyone' | string[] | '';
-  /** Habits only. Empty until someone types a number: a habit's schedule is never assumed. */
+  /** Habits only. Empty until someone types a number or picks "When needed": a habit's schedule is never assumed. */
   frequency: string;
+  whenNeeded: boolean;
   lastDone: string;
   /** Quests only; kept as-is so editing a finished quest doesn't restart it. */
   completedAt?: number;
@@ -66,6 +67,7 @@ const blankForm = (kind: TendKind): Form => ({
   ownerId: '',
   availableTo: '',
   frequency: '',
+  whenNeeded: false,
   lastDone: '',
 });
 
@@ -82,7 +84,8 @@ const toForm = (t: Tend): Form => ({
   status: t.status,
   ownerId: t.kind === 'habit' ? (t.ownerId ?? '') : '',
   availableTo: t.kind === 'quest' ? t.availableTo : '',
-  frequency: t.kind === 'habit' ? String(t.frequencyDays) : '',
+  frequency: t.kind === 'habit' && t.schedule === 'every' ? String(t.frequencyDays) : '',
+  whenNeeded: t.kind === 'habit' && t.schedule === 'whenNeeded',
   lastDone: t.lastDone != null ? dayKey(t.lastDone) : '',
   completedAt: t.kind === 'quest' ? t.completedAt : undefined,
 });
@@ -98,7 +101,8 @@ function toTend(f: Form): { tend: Parameters<typeof saveTend>[0] } | { errors: s
     errors.push('Choose who can take this quest on: everyone, or particular members.');
   if (f.description.length > DESCRIPTION_MAX) errors.push(`Keep the description under ${DESCRIPTION_MAX} characters.`);
   const days = Number(f.frequency);
-  if (f.kind === 'habit' && !(Number.isInteger(days) && days >= 1 && days <= 3650)) errors.push('A habit needs to say how often: every 1 to 3650 days.');
+  if (f.kind === 'habit' && !f.whenNeeded && !(Number.isInteger(days) && days >= 1 && days <= 3650))
+    errors.push('A habit needs to say how often: every 1 to 3650 days, or “When needed”.');
   if (errors.length || !f.impact || (f.kind === 'quest' && f.availableTo === '')) return { errors };
 
   const common = {
@@ -115,7 +119,13 @@ function toTend(f: Form): { tend: Parameters<typeof saveTend>[0] } | { errors: s
   return {
     tend:
       f.kind === 'habit'
-        ? { ...common, kind: 'habit', roomId: f.roomId, frequencyDays: days, ...(f.ownerId && { ownerId: f.ownerId }) }
+        ? {
+            ...common,
+            kind: 'habit',
+            roomId: f.roomId,
+            ...(f.whenNeeded ? { schedule: 'whenNeeded' as const } : { schedule: 'every' as const, frequencyDays: days }),
+            ...(f.ownerId && { ownerId: f.ownerId }),
+          }
         : {
             ...common,
             kind: 'quest',
@@ -280,10 +290,22 @@ function TendEditor({ initial, onClose }: { initial: Form; onClose(): void }) {
 
       <div className="row">
         {f.kind === 'habit' && (
-          <label className="field">
-            <span>Every … days</span>
-            <input type="number" min={1} max={3650} value={f.frequency} placeholder="e.g. 7" onChange={(e) => set({ frequency: e.target.value })} />
-          </label>
+          <div className="field">
+            <label htmlFor="habit-every">How often? Every … days</label>
+            <input
+              id="habit-every"
+              type="number"
+              min={1}
+              max={3650}
+              value={f.frequency}
+              placeholder={f.whenNeeded ? 'When needed' : 'e.g. 7'}
+              disabled={f.whenNeeded}
+              onChange={(e) => set({ frequency: e.target.value })}
+            />
+            <label className="check small">
+              <input type="checkbox" checked={f.whenNeeded} onChange={(e) => set({ whenNeeded: e.target.checked })} /> When needed: no schedule, never overdue
+            </label>
+          </div>
         )}
         <label className="field">
           <span>Last done</span>
@@ -394,7 +416,7 @@ export function Tending() {
       </span>
       <span className="muted small">
         {showRoom ? `${t.roomId ? roomName(t.roomId) : OUT_AND_ABOUT.name} · ` : ''}
-        {t.kind === 'habit' ? `every ${t.frequencyDays}d` : t.completedAt != null ? `done ${new Date(t.completedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : 'one-off'}
+        {t.kind === 'habit' ? (t.schedule === 'whenNeeded' ? 'when needed' : `every ${t.frequencyDays}d`) : t.completedAt != null ? `done ${new Date(t.completedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : 'one-off'}
         {t.kind === 'quest' && ` · ${questFor(t.availableTo)}`}
         {` · ${IMPACTS[t.impact].label} impact`}
         {t.status === 'paused' ? ' · Paused' : ''}

@@ -86,12 +86,13 @@ export async function updateTend(id: string, patch: Partial<CommonTendFields>): 
   await db.tends.update(id, patch);
 }
 
-/** Habits only: how often it comes back. */
-export async function setFrequency(id: string, frequencyDays: number): Promise<void> {
+/** Habits only: how often it comes back, every so many days or whenever it's needed. */
+export async function setFrequency(id: string, every: number | 'whenNeeded'): Promise<void> {
   const tend = await db.tends.get(id);
   if (tend?.kind !== 'habit') throw new Error('Only habits have a frequency.');
-  if (isRemote()) await server.patchTend(id, { frequencyDays });
-  await db.tends.update(id, { frequencyDays });
+  const change = every === 'whenNeeded' ? { schedule: 'whenNeeded' as const, frequencyDays: undefined } : { schedule: 'every' as const, frequencyDays: every };
+  if (isRemote()) await server.patchTend(id, change);
+  await db.tends.update(id, change);
 }
 
 /** Takes a quest off the Completed shelf so it can be done again. */

@@ -13,7 +13,8 @@ const daysAgo = (n: number) => NOW - n * DAY;
 
 let seq = 0;
 const base = () => ({ id: `t${++seq}`, name: `Tend ${seq}`, roomId: 'kitchen', tier: 'bee' as const, impact: 'medium' as const, energy: [], status: 'active' as const });
-const habit = (over: Partial<Omit<Habit, 'kind'>> = {}): Habit => ({ ...base(), kind: 'habit', frequencyDays: 7, ...over });
+const habit = (over: Partial<Omit<Habit, 'kind'>> = {}): Habit => ({ ...base(), kind: 'habit', schedule: 'every', frequencyDays: 7, ...over }) as Habit;
+const whenNeeded = (over: Partial<Omit<Habit, 'kind' | 'schedule' | 'frequencyDays'>> = {}): Habit => ({ ...base(), kind: 'habit', schedule: 'whenNeeded', ...over });
 const quest = (over: Partial<Omit<Quest, 'kind'>> = {}): Quest => ({ ...base(), kind: 'quest', availableTo: 'everyone', ...over });
 
 describe('dates', () => {
@@ -28,6 +29,36 @@ describe('dates', () => {
   });
   it('weeks start on Monday', () => {
     expect(new Date(startOfWeek(NOW)).getDay()).toBe(1);
+  });
+});
+
+describe('habits done when needed', () => {
+  const ctx = { now: NOW, memberId: 'alex' };
+  it('are never overdue, and never count towards room health', () => {
+    const mop = whenNeeded({ name: 'Mop up spills', lastDone: daysAgo(400) });
+    expect(needOf(mop, NOW)).toBe('whenNeeded');
+    expect(needRatio(mop, NOW)).toBeUndefined();
+    expect(roomHealth({ id: 'kitchen', name: 'Kitchen', sortOrder: 0 }, [mop], NOW).level).toBe('resting');
+    expect(quickSet([mop], ctx)).toEqual([]);
+  });
+
+  it('sit below anything due, drop to the bottom once done, and rise slowly after', () => {
+    const due = habit({ name: 'Due', frequencyDays: 10, lastDone: daysAgo(8) });
+    const neverLogged = habit({ name: 'Never logged' });
+    const longAgo = whenNeeded({ name: 'Mop, long ago', lastDone: daysAgo(60) });
+    const justNow = whenNeeded({ name: 'Mop, just now', lastDone: NOW - 1000 });
+    const resting = habit({ name: 'Resting', frequencyDays: 10, lastDone: daysAgo(2) });
+    const order = browse([justNow, resting, longAgo, neverLogged, due], ctx, 'habit', {}).map((t) => t.name);
+    expect(order).toEqual(['Due', 'Never logged', 'Mop, long ago', 'Resting', 'Mop, just now']);
+  });
+
+  it('import from a Frequency of “When needed” and export it back', () => {
+    const csv = 'Name,Room,Kind,Ecological Impact,Effort Tier,Frequency (Days),Status\nMop up spills,Kitchen,Habit,Small,Sloth,When needed,Active\nWipe hob,Kitchen,Habit,Small,Sloth,As needed,Active';
+    const { tends, errors } = parseTendsCsv(csv);
+    expect(errors).toEqual([]);
+    expect(tends.map((t) => t.kind === 'habit' && t.schedule)).toEqual(['whenNeeded', 'whenNeeded']);
+    const out = toTendsCsv([whenNeeded({ name: 'Mop up spills', roomId: 'k' })], [], [{ id: 'k', name: 'Kitchen', sortOrder: 0 }]);
+    expect(out).toContain('When needed');
   });
 });
 
@@ -147,6 +178,10 @@ describe('selection', () => {
     expect(browse(all, ctx, 'habit', { roomId: 'kitchen' }).map((t) => t.id)).toEqual([sink.id, justDone.id]);
     expect(browse(all, ctx, 'habit', { query: 'sink' }).map((t) => t.id)).toEqual([sink.id]);
     expect(browse(all, ctx, 'habit', { query: 'tip' })).toEqual([]);
+    // Doing something drops it below everything that might still need doing, never-logged habits included.
+    const neverLogged = habit({ name: 'Zz never logged' });
+    const due = habit({ name: 'Zz due soon', frequencyDays: 10, lastDone: daysAgo(8) });
+    expect(browse([justDone, neverLogged, due, sink], ctx, 'habit', { roomId: 'kitchen' }).map((t) => t.id)).toEqual([sink.id, due.id, neverLogged.id, justDone.id]);
     expect(browse(all, ctx, 'habit', { energy: ['sensory'] }).map((t) => t.id)).toEqual([sink.id]);
   });
 

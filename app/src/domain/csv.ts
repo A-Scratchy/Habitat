@@ -181,9 +181,11 @@ export function parseTendsCsv(text: string): ParseResult {
     if (!tier) problem(`Effort Tier must be Sloth, Tortoise, Worker Bee or Elephant, not “${cell('tier')}”.`);
 
     const freqText = cell('frequency');
+    // "When needed" (or "As needed") is a habit with no schedule; otherwise it's a number of days.
+    const whenNeeded = /^(when|as) needed$/i.test(freqText);
     const freq = Number(freqText);
-    if (kind === 'habit' && !(Number.isInteger(freq) && freq >= 1 && freq <= 3650))
-      problem(`a Habit needs a Frequency (Days) between 1 and 3650, not “${freqText}”.`);
+    if (kind === 'habit' && !whenNeeded && !(Number.isInteger(freq) && freq >= 1 && freq <= 3650))
+      problem(`a Habit needs a Frequency (Days) between 1 and 3650, or “When needed”, not “${freqText}”.`);
     if (kind === 'quest' && freqText !== '') problem('a Quest has no Frequency (Days); leave it blank.');
 
     const status = parseStatus(cell('status'));
@@ -220,7 +222,7 @@ export function parseTendsCsv(text: string): ParseResult {
     };
     tends.push(
       kind === 'habit'
-        ? { ...common, kind, frequencyDays: freq, ...(cell('owner') && { ownerName: cell('owner') }) }
+        ? { ...common, kind, ...(whenNeeded ? { schedule: 'whenNeeded' as const } : { schedule: 'every' as const, frequencyDays: freq }), ...(cell('owner') && { ownerName: cell('owner') }) }
         : { ...common, kind, availableToNames: availableToNames!, ...(status.done && { completed: true }) },
     );
   });
@@ -252,7 +254,7 @@ export function toTendsCsv(tends: Tend[], members: Member[], rooms: Room[]): str
       t.description ?? '',
       TIER_EXPORT[t.tier],
       t.energy.join(', '),
-      t.frequencyDays ?? '',
+      t.kind === 'habit' ? (t.schedule === 'whenNeeded' ? 'When needed' : t.frequencyDays) : '',
       t.lastDone != null ? dayKey(t.lastDone) : '',
       (t.ownerId && memberName.get(t.ownerId)) ?? '',
       t.completedAt != null ? 'Done' : t.status === 'paused' ? 'Paused' : 'Active',

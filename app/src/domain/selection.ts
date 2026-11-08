@@ -1,6 +1,6 @@
 import { dayKey, daysBetween, HOUR, startOfWeek } from './dates';
 import { isCompleted, isHabit, isQuest, OUT_AND_ABOUT, TIER_ORDER, type EffortTier, type EnergyTag, type Tend, type TendKind, type Win } from './types';
-import { needOf, needRatio } from './urgency';
+import { needOf, needRank, needRatio } from './urgency';
 
 export interface ViewContext {
   now: number;
@@ -52,7 +52,7 @@ export function myClaims(tends: Tend[], ctx: ViewContext): Tend[] {
  */
 export function quickSet(tends: Tend[], ctx: ViewContext, round = 0): Tend[] {
   const pool = dailyPool(tends, ctx)
-    .filter((t) => !isHandsOff(t, ctx) && needOf(t, ctx.now) !== 'resting' && needOf(t, ctx.now) !== 'unknown')
+    .filter((t) => !isHandsOff(t, ctx) && ['soon', 'thirsty', 'wilting'].includes(needOf(t, ctx.now)))
     .sort((a, b) => needRatio(b, ctx.now)! - needRatio(a, ctx.now)! || a.name.localeCompare(b.name));
   return TIER_ORDER.flatMap((tier) => {
     const ofTier = pool.filter((t) => t.tier === tier);
@@ -111,7 +111,7 @@ export function matchesQuery(t: Tend, query: string, roomName = ''): boolean {
  * and finished quests never show here (they live in the Tending tab and the Completed shelf).
  */
 export function browse(tends: Tend[], ctx: ViewContext, kind: TendKind, f: BrowseFilter, roomName: (id?: string) => string = () => ''): Tend[] {
-  const rank = (t: Tend) => needRatio(t, ctx.now) ?? -1;
+  const rank = (t: Tend) => needRank(t, ctx.now);
   const inRoom = (t: Tend) => (f.roomId === NO_ROOM ? !t.roomId : !f.roomId || t.roomId === f.roomId);
   const inScope = (t: Tend) => isOpen(t) && t.kind === kind && inRoom(t) && isAvailableTo(t, ctx.memberId);
   return tends

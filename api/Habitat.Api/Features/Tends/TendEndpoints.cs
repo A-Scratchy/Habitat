@@ -23,7 +23,7 @@ public record TendInput(
     EffortTier? Tier,
     EcologicalImpact? Impact,
     EnergyTag[]? Energy,
-    /// <summary>Required for habits; must be empty for quests.</summary>
+    /// <summary>Required for habits on an Every schedule; must be empty otherwise.</summary>
     int? FrequencyDays,
     TendStatus? Status,
     /// <summary>Habits only.</summary>
@@ -35,7 +35,9 @@ public record TendInput(
     /// <summary>Quests only, and required for them: true = anyone can take it on.</summary>
     bool? OpenToEveryone = null,
     /// <summary>Quests only: who can take it on when it isn't open to everyone (at least one).</summary>
-    Guid[]? AvailableTo = null);
+    Guid[]? AvailableTo = null,
+    /// <summary>Habits only, and required for them: Every (with FrequencyDays) or WhenNeeded (without).</summary>
+    HabitSchedule? Schedule = null);
 
 public record BulkTend(Guid Id, TendInput Tend);
 
@@ -70,12 +72,18 @@ public static class TendEndpoints
         if (t.Group is { Length: > 40 }) errors["group"] = ["At most 40 characters."];
         if (t.Description is { Length: > TendRules.DescriptionMax }) errors["description"] = [$"At most {TendRules.DescriptionMax} characters."];
         if (t.Energy.Count != t.Energy.Distinct().Count()) errors["energy"] = ["No repeated tags."];
-        switch (t.Kind)
+        switch (t.Kind, t.Schedule)
         {
-            case TendKind.Habit when t.FrequencyDays is not (>= 1 and <= TendRules.MaxFrequencyDays):
-                errors["frequencyDays"] = [$"A habit needs one: every 1 to {TendRules.MaxFrequencyDays} days."];
+            case (TendKind.Habit, null):
+                errors["schedule"] = ["A habit needs one: Every (some number of days) or WhenNeeded."];
                 break;
-            case TendKind.Quest when t.FrequencyDays is not null:
+            case (TendKind.Habit, HabitSchedule.Every) when t.FrequencyDays is not (>= 1 and <= TendRules.MaxFrequencyDays):
+                errors["frequencyDays"] = [$"Every 1 to {TendRules.MaxFrequencyDays} days."];
+                break;
+            case (TendKind.Habit, HabitSchedule.WhenNeeded) when t.FrequencyDays is not null:
+                errors["frequencyDays"] = ["A habit done when needed has no frequency; leave it empty."];
+                break;
+            case (TendKind.Quest, _) when t.Schedule is not null || t.FrequencyDays is not null:
                 errors["frequencyDays"] = ["A quest has no schedule; leave it empty."];
                 break;
         }
@@ -110,6 +118,7 @@ public static class TendEndpoints
         t.Tier = input.Tier!.Value;
         t.Impact = input.Impact!.Value;
         t.Energy = [.. input.Energy ?? []];
+        t.Schedule = input.Schedule;
         t.FrequencyDays = input.FrequencyDays;
         t.Status = input.Status!.Value;
         t.OwnerMemberId = input.OwnerMemberId;
@@ -177,7 +186,7 @@ public static class TendEndpoints
     }
 
     /// <summary>Kind isn't here on purpose: switching between habit and quest is a full PUT, so both sides' fields are given.</summary>
-    private static readonly HashSet<string> Patchable = ["name", "roomId", "group", "description", "tier", "impact", "energy", "frequencyDays", "status", "ownerMemberId", "openToEveryone", "availableTo"];
+    private static readonly HashSet<string> Patchable = ["name", "roomId", "group", "description", "tier", "impact", "energy", "schedule", "frequencyDays", "status", "ownerMemberId", "openToEveryone", "availableTo"];
 
     private static async Task<IResult> Patch(Guid id, JsonElement body, ClaimsPrincipal principal, HabitatDb db, TimeProvider clock, IOptions<JsonOptions> json)
     {
@@ -205,6 +214,7 @@ public static class TendEndpoints
                     case "description": tend.Description = string.IsNullOrWhiteSpace(prop.Value.GetString()) ? null : prop.Value.GetString()!.Trim(); break;
                     case "tier": tend.Tier = prop.Value.Deserialize<EffortTier>(options); break;
                     case "energy": tend.Energy = [.. prop.Value.Deserialize<EnergyTag[]>(options) ?? []]; break;
+                    case "schedule": tend.Schedule = prop.Value.Deserialize<HabitSchedule?>(options); break;
                     case "frequencyDays": tend.FrequencyDays = prop.Value.Deserialize<int?>(options); break;
                     case "status": tend.Status = prop.Value.Deserialize<TendStatus>(options); break;
                     case "ownerMemberId": tend.OwnerMemberId = prop.Value.Deserialize<Guid?>(options); break;

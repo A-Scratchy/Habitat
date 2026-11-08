@@ -139,10 +139,10 @@ function TweakPanel({ tend }: { tend: Tend }) {
 
       {tend.kind === 'habit' && (
       <fieldset className="field">
-        <legend>How often? Every … days</legend>
+        <legend>How often? Every … days, or when needed</legend>
         <div className="chips wrap">
           {FREQUENCIES.map((n) => (
-            <button key={n} type="button" className={`chip${tend.frequencyDays === n ? ' on' : ''}`} aria-pressed={tend.frequencyDays === n} onClick={() => void setFrequency(tend.id, n)}>
+            <button key={n} type="button" className={`chip${tend.schedule === 'every' && tend.frequencyDays === n ? ' on' : ''}`} aria-pressed={tend.schedule === 'every' && tend.frequencyDays === n} onClick={() => void setFrequency(tend.id, n)}>
               {n}
             </button>
           ))}
@@ -150,12 +150,20 @@ function TweakPanel({ tend }: { tend: Tend }) {
             className="chip-input"
             type="number"
             min={1}
-            key={tend.frequencyDays}
-            defaultValue={FREQUENCIES.includes(tend.frequencyDays) ? '' : tend.frequencyDays}
+            key={tend.frequencyDays ?? 'whenNeeded'}
+            defaultValue={tend.schedule === 'whenNeeded' || FREQUENCIES.includes(tend.frequencyDays) ? '' : tend.frequencyDays}
             placeholder="Other"
             aria-label="Other number of days"
             onBlur={(e) => +e.target.value >= 1 && void setFrequency(tend.id, Math.round(+e.target.value))}
           />
+          <button
+            type="button"
+            className={`chip${tend.schedule === 'whenNeeded' ? ' on' : ''}`}
+            aria-pressed={tend.schedule === 'whenNeeded'}
+            onClick={() => void setFrequency(tend.id, 'whenNeeded')}
+          >
+            🌼 When needed
+          </button>
         </div>
       </fieldset>
       )}

@@ -81,6 +81,7 @@ public class HabitatDb(DbContextOptions<HabitatDb> options, ICurrentHousehold? c
             e.Property(x => x.Description).HasMaxLength(TendRules.DescriptionMax);
             e.Property(x => x.Tier).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Schedule).HasConversion<string>().HasMaxLength(16);
             e.PrimitiveCollection(x => x.Energy).ElementType().HasConversion<string>();
             e.OwnsMany(x => x.AvailableTo, m =>
             {
@@ -93,7 +94,9 @@ public class HabitatDb(DbContextOptions<HabitatDb> options, ICurrentHousehold? c
             // "IS NOT NULL" is spelled out: SQL treats a CHECK that evaluates to unknown (NULL BETWEEN ...) as passing.
             e.ToTable(t => t.HasCheckConstraint(
                 "CK_Tends_KindFields",
-                "([Kind] = 'Habit' AND [RoomId] IS NOT NULL AND [FrequencyDays] IS NOT NULL AND [FrequencyDays] BETWEEN 1 AND 3650 AND [CompletedAt] IS NULL AND [OpenToEveryone] IS NULL) OR ([Kind] = 'Quest' AND [FrequencyDays] IS NULL AND [OpenToEveryone] IS NOT NULL AND [OwnerMemberId] IS NULL)"));
+                "([Kind] = 'Habit' AND [RoomId] IS NOT NULL AND [CompletedAt] IS NULL AND [OpenToEveryone] IS NULL AND [Schedule] IS NOT NULL AND (" +
+                "([Schedule] = 'Every' AND [FrequencyDays] IS NOT NULL AND [FrequencyDays] BETWEEN 1 AND 3650) OR ([Schedule] = 'WhenNeeded' AND [FrequencyDays] IS NULL)))" +
+                " OR ([Kind] = 'Quest' AND [Schedule] IS NULL AND [FrequencyDays] IS NULL AND [OpenToEveryone] IS NOT NULL AND [OwnerMemberId] IS NULL)"));
         });
 
         b.Entity<Win>(e =>

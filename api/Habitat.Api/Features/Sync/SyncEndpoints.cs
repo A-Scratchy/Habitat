@@ -9,10 +9,10 @@ public record SyncRoom(Guid Id, string Name, string? Icon, int SortOrder, DateTi
 
 public record SyncMember(Guid Id, string Name, string Animal, CompletionSound Sound, bool IsUser, DateTimeOffset UpdatedAt, DateTimeOffset? DeletedAt);
 
-/// <summary>FrequencyDays and RoomId are always set for habits; quests have no FrequencyDays and may have no room.</summary>
+/// <summary>RoomId and Schedule are always set for habits, and FrequencyDays when the schedule is Every; quests have neither and may have no room.</summary>
 public record SyncTend(
     Guid Id, TendKind Kind, string Name, Guid? RoomId, string? Group, string? Description, EffortTier Tier, EcologicalImpact Impact, EnergyTag[] Energy,
-    int? FrequencyDays, TendStatus Status, DateTimeOffset? CompletedAt,
+    HabitSchedule? Schedule, int? FrequencyDays, TendStatus Status, DateTimeOffset? CompletedAt,
     Guid? OwnerMemberId, bool? OpenToEveryone, Guid[] AvailableTo, Guid? ClaimMemberId, DateOnly? ClaimDay, DateTimeOffset? LastDoneAt, DateTimeOffset UpdatedAt, DateTimeOffset? DeletedAt);
 
 /// <summary>MemberIds: primary first.</summary>
@@ -61,7 +61,7 @@ public static class SyncEndpoints
             .Where(t => t.RowVersion > from && t.RowVersion < upper && (!full || t.DeletedAt == null))
             .Select(t => new SyncTend(
                 t.Id, t.Kind, t.Name, t.RoomId, t.Group, t.Description, t.Tier, t.Impact, t.Energy.ToArray(),
-                t.FrequencyDays, t.Status, t.CompletedAt,
+                t.Schedule, t.FrequencyDays, t.Status, t.CompletedAt,
                 t.OwnerMemberId, t.OpenToEveryone, t.AvailableTo.Select(a => a.MemberId).ToArray(), t.ClaimMemberId, t.ClaimDay, t.LastDoneAt, t.UpdatedAt, t.DeletedAt))
             .ToArrayAsync();
 

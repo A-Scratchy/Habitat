@@ -19,7 +19,7 @@ export function mockHistory(
   // Keep today's pretend wins in waking hours where possible.
   const wake = Math.min(today + 7 * HOUR, now);
   const out = tends.map((t) => {
-    if (!t.frequencyDays || t.status !== 'active') return t;
+    if (t.kind !== 'habit' || t.schedule !== 'every' || t.status !== 'active') return t;
     const daysAgo = Math.floor(rnd() * t.frequencyDays * 1.8);
     const at =
       daysAgo === 0

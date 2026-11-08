@@ -16,7 +16,7 @@ public class TendWinSyncTests(ApiFixture api)
     private Guid _kitchen;
 
     private TendInput Bins(int every = 3, Guid? owner = null, DateTimeOffset? seed = null) =>
-        new(TendKind.Habit, "Empty Bin", _kitchen, "Empty Bins", null, EffortTier.Tortoise, EcologicalImpact.Medium, [EnergyTag.Brainless], every, TendStatus.Active, owner, seed);
+        new(TendKind.Habit, "Empty Bin", _kitchen, "Empty Bins", null, EffortTier.Tortoise, EcologicalImpact.Medium, [EnergyTag.Brainless], every, TendStatus.Active, owner, seed, Schedule: HabitSchedule.Every);
 
     private TendInput Tip(string? description = null, DateTimeOffset? completedAt = null) =>
         new(TendKind.Quest, "Go to tip", _kitchen, null, description, EffortTier.Elephant, EcologicalImpact.Large, [], null, TendStatus.Active, null, null, completedAt, OpenToEveryone: true);
@@ -67,7 +67,9 @@ public class TendWinSyncTests(ApiFixture api)
     [InlineData("""{ "name": "X", "roomId": "ROOM", "impact": "Medium", "tier": "Bee", "status": "Active", "frequencyDays": 7 }""", "kind")]
     [InlineData("""{ "kind": "Habit", "name": "X", "roomId": "ROOM", "impact": "Medium", "status": "Active", "frequencyDays": 7 }""", "tier")]
     [InlineData("""{ "kind": "Habit", "name": "X", "roomId": "ROOM", "impact": "Medium", "tier": "Bee", "frequencyDays": 7 }""", "status")]
-    [InlineData("""{ "kind": "Habit", "name": "X", "roomId": "ROOM", "impact": "Medium", "tier": "Bee", "status": "Active" }""", "frequencyDays")]
+    [InlineData("""{ "kind": "Habit", "name": "X", "roomId": "ROOM", "impact": "Medium", "tier": "Bee", "status": "Active", "schedule": "Every" }""", "frequencyDays")]
+    [InlineData("""{ "kind": "Habit", "name": "X", "roomId": "ROOM", "impact": "Medium", "tier": "Bee", "status": "Active", "frequencyDays": 7 }""", "schedule")]
+    [InlineData("""{ "kind": "Habit", "name": "X", "roomId": "ROOM", "impact": "Medium", "tier": "Bee", "status": "Active", "schedule": "WhenNeeded", "frequencyDays": 7 }""", "frequencyDays")]
     [InlineData("""{ "kind": "Quest", "name": "X", "roomId": "ROOM", "impact": "Medium", "tier": "Bee", "status": "Active", "frequencyDays": 7 }""", "frequencyDays")]
     [InlineData("""{ "kind": "Chore", "name": "X", "roomId": "ROOM", "impact": "Medium", "tier": "Bee", "status": "Active" }""", null)]
     public async Task Nothing_is_assumed_kind_tier_status_and_schedule_must_be_right(string json, string? field)
@@ -89,6 +91,8 @@ public class TendWinSyncTests(ApiFixture api)
         await Assert.ThrowsAnyAsync<Exception>(() => raw.ExecuteUpdateAsync(s => s.SetProperty(t => t.FrequencyDays, (int?)null)));
         await Assert.ThrowsAnyAsync<Exception>(() => raw.ExecuteUpdateAsync(s => s.SetProperty(t => t.CompletedAt, DateTimeOffset.UtcNow)));
         await Assert.ThrowsAnyAsync<Exception>(() => raw.ExecuteUpdateAsync(s => s.SetProperty(t => t.Kind, TendKind.Quest)));
+        await Assert.ThrowsAnyAsync<Exception>(() => raw.ExecuteUpdateAsync(s => s.SetProperty(t => t.Schedule, (HabitSchedule?)null)));
+        await Assert.ThrowsAnyAsync<Exception>(() => raw.ExecuteUpdateAsync(s => s.SetProperty(t => t.Schedule, HabitSchedule.WhenNeeded)));
     }
 
     [Fact]
@@ -97,7 +101,7 @@ public class TendWinSyncTests(ApiFixture api)
         var (_, device, _, habitId) = await Setup();
         Assert.Equal(HttpStatusCode.BadRequest, (await device.PatchAsJsonAsync($"/api/tends/{habitId}", new { kind = "Quest" })).StatusCode);
 
-        (await device.PutAsJsonAsync($"/api/tends/{habitId}", Bins() with { Kind = TendKind.Quest, FrequencyDays = null, OpenToEveryone = true }, Json.Options)).EnsureSuccessStatusCode();
+        (await device.PutAsJsonAsync($"/api/tends/{habitId}", Bins() with { Kind = TendKind.Quest, Schedule = null, FrequencyDays = null, OpenToEveryone = true }, Json.Options)).EnsureSuccessStatusCode();
         var t = await Tend(device, habitId);
         Assert.Equal((TendKind.Quest, (int?)null), (t.Kind, t.FrequencyDays));
     }
@@ -336,6 +340,27 @@ public class TendWinSyncTests(ApiFixture api)
 
         Assert.Null((await Tend(device, leosHabit)).OwnerMemberId);
         Assert.DoesNotContain((await Sync(device)).Members, m => m.Id == leo);
+    }
+
+    [Fact]
+    public async Task Habits_can_be_done_when_needed_with_no_frequency()
+    {
+        var (_, device, _, binId) = await Setup();
+        var mop = Guid.NewGuid();
+        var whenNeeded = Bins() with { Name = "Mop up spills", Schedule = HabitSchedule.WhenNeeded, FrequencyDays = null };
+        Assert.Equal(HttpStatusCode.NoContent, (await device.PutAsJsonAsync($"/api/tends/{mop}", whenNeeded, Json.Options)).StatusCode);
+        var synced = await Tend(device, mop);
+        Assert.Equal((HabitSchedule?)HabitSchedule.WhenNeeded, synced.Schedule);
+        Assert.Null(synced.FrequencyDays);
+
+        // Switching between the two is a patch of both fields together; one without the other is refused.
+        Assert.Equal(HttpStatusCode.NoContent, (await device.PatchAsJsonAsync($"/api/tends/{binId}", new { schedule = "WhenNeeded", frequencyDays = (int?)null })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PatchAsJsonAsync($"/api/tends/{binId}", new { schedule = "Every" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await device.PatchAsJsonAsync($"/api/tends/{binId}", new { schedule = "Every", frequencyDays = 5 })).StatusCode);
+        Assert.Equal(5, (await Tend(device, binId)).FrequencyDays);
+
+        // Quests never have a schedule.
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PutAsJsonAsync($"/api/tends/{Guid.NewGuid()}", Tip() with { Schedule = HabitSchedule.WhenNeeded }, Json.Options)).StatusCode);
     }
 
     [Fact]

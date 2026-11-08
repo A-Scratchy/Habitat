@@ -152,10 +152,19 @@ public enum TendStatus
     Paused,
 }
 
+/// <summary>How a habit comes back. Always stated for a habit, never assumed from a missing frequency.</summary>
+public enum HabitSchedule
+{
+    /// <summary>Every FrequencyDays days; it gets thirsty when it's overdue.</summary>
+    Every,
+    /// <summary>Done whenever it's needed: never overdue, and it doesn't count towards room health.</summary>
+    WhenNeeded,
+}
+
 /// <summary>
 /// One thing that looks after the habitat. The Kind decides which of the kind-specific fields apply;
-/// a database CHECK constraint enforces it: a habit always has FrequencyDays and never CompletedAt,
-/// a quest never has FrequencyDays.
+/// a database CHECK constraint enforces it: a habit always has a Schedule (with FrequencyDays exactly
+/// when it's Every) and never CompletedAt; a quest has neither a Schedule nor FrequencyDays.
 /// </summary>
 public class Tend : HouseholdEntity, ISynced
 {
@@ -170,6 +179,8 @@ public class Tend : HouseholdEntity, ISynced
     public EcologicalImpact Impact { get; set; }
     public List<EnergyTag> Energy { get; set; } = [];
     /// <summary>Habits only (required for them).</summary>
+    public HabitSchedule? Schedule { get; set; }
+    /// <summary>Habits on an Every schedule only (required for them).</summary>
     public int? FrequencyDays { get; set; }
     public TendStatus Status { get; set; }
     /// <summary>Quests only: when it was finished. Set means it's on the Completed shelf.</summary>

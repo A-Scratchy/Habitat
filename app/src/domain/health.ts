@@ -31,11 +31,11 @@ interface Tally {
   wilting: number;
 }
 
-/** Only active habits count: quests have no schedule, so they can never make a room look worse. */
+/** Only active habits on a schedule count: quests and habits done when needed can never make a room look worse. */
 function tally(tends: Tend[], now: number): Tally {
   const t: Tally = { penalty: 0, max: 0, habits: 0, known: 0, thirsty: 0, wilting: 0 };
   for (const tend of tends) {
-    if (tend.kind !== 'habit' || tend.status !== 'active') continue;
+    if (tend.kind !== 'habit' || tend.status !== 'active' || tend.schedule !== 'every') continue;
     t.habits++;
     const need = needOf(tend, now);
     if (need === 'unknown') continue;

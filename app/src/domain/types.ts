@@ -46,17 +46,23 @@ interface TendBase {
   claim?: Claim;
 }
 
-/** Comes back on a schedule. Always has one. */
-export interface Habit extends TendBase {
+interface HabitBase extends TendBase {
   kind: 'habit';
   /** A habit always belongs to a room. */
   roomId: string;
   /** Permanent owner: "this is my zone". */
   ownerId?: string;
-  /** Repeat interval in days. */
-  frequencyDays: number;
   completedAt?: never;
 }
+
+/** How a habit comes back: always stated, never assumed from a missing number. */
+export type HabitSchedule = 'every' | 'whenNeeded';
+
+/**
+ * Keeps coming back. Either every so many days (it gets thirsty when overdue), or whenever it's
+ * needed (never overdue, and it doesn't count towards room health).
+ */
+export type Habit = HabitBase & ({ schedule: 'every'; frequencyDays: number } | { schedule: 'whenNeeded'; frequencyDays?: never });
 
 /** A one-off. Never has a schedule; when done it moves to the Completed shelf. */
 export interface Quest extends TendBase {
@@ -66,6 +72,7 @@ export interface Quest extends TendBase {
   /** Who can take it on: everyone, or particular members (at least one). It only shows on their Quests menu. */
   availableTo: 'everyone' | string[];
   ownerId?: never;
+  schedule?: never;
   frequencyDays?: never;
   /** When it was finished. Set means it's on the Completed shelf; restarting clears it. */
   completedAt?: number;

@@ -299,6 +299,10 @@ namespace Habitat.Api.Data.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<string>("Schedule")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
                     b.Property<DateTimeOffset?>("SeedLastDoneAt")
                         .HasColumnType("datetimeoffset");
 
@@ -325,7 +329,7 @@ namespace Habitat.Api.Data.Migrations
 
                     b.ToTable("Tends", t =>
                         {
-                            t.HasCheckConstraint("CK_Tends_KindFields", "([Kind] = 'Habit' AND [RoomId] IS NOT NULL AND [FrequencyDays] IS NOT NULL AND [FrequencyDays] BETWEEN 1 AND 3650 AND [CompletedAt] IS NULL AND [OpenToEveryone] IS NULL) OR ([Kind] = 'Quest' AND [FrequencyDays] IS NULL AND [OpenToEveryone] IS NOT NULL AND [OwnerMemberId] IS NULL)");
+                            t.HasCheckConstraint("CK_Tends_KindFields", "([Kind] = 'Habit' AND [RoomId] IS NOT NULL AND [CompletedAt] IS NULL AND [OpenToEveryone] IS NULL AND [Schedule] IS NOT NULL AND (([Schedule] = 'Every' AND [FrequencyDays] IS NOT NULL AND [FrequencyDays] BETWEEN 1 AND 3650) OR ([Schedule] = 'WhenNeeded' AND [FrequencyDays] IS NULL))) OR ([Kind] = 'Quest' AND [Schedule] IS NULL AND [FrequencyDays] IS NULL AND [OpenToEveryone] IS NOT NULL AND [OwnerMemberId] IS NULL)");
                         });
                 });
 

@@ -12,7 +12,8 @@ const serverTend = {
   tier: 'Bee',
   impact: 'Large',
   energy: ['Micro', 'Brainless'],
-  frequencyDays: 2,
+  schedule: 'Every' as string | null,
+  frequencyDays: 2 as number | null,
   status: 'Active',
   completedAt: null,
   ownerMemberId: 'robin',
@@ -34,6 +35,7 @@ describe('server shapes', () => {
       tier: 'bee',
       impact: 'large',
       energy: ['micro', 'brainless'],
+      schedule: 'every',
       frequencyDays: 2,
       status: 'active',
       ownerId: 'robin',
@@ -43,7 +45,7 @@ describe('server shapes', () => {
   });
 
   it('reads quests: open to everyone or particular members, with or without a room', () => {
-    const base = { ...serverTend, kind: 'Quest', frequencyDays: null, ownerMemberId: null, claimMemberId: null, claimDay: null, lastDoneAt: null };
+    const base = { ...serverTend, kind: 'Quest', schedule: null, frequencyDays: null, ownerMemberId: null, claimMemberId: null, claimDay: null, lastDoneAt: null };
     const everyone = tendFromServer({ ...base, roomId: null, openToEveryone: true }) as Quest;
     expect(everyone.availableTo).toBe('everyone');
     expect(everyone.roomId).toBeUndefined();
@@ -54,7 +56,8 @@ describe('server shapes', () => {
 
   it('refuses values it does not know, and habits missing their room or schedule', () => {
     expect(() => tendFromServer({ ...serverTend, tier: 'Hamster' })).toThrow(/Hamster/);
-    expect(() => tendFromServer({ ...serverTend, frequencyDays: null })).toThrow(/schedule/);
+    expect(() => tendFromServer({ ...serverTend, frequencyDays: null })).toThrow(/how often/);
+    expect(() => tendFromServer({ ...serverTend, schedule: null })).toThrow(/schedule/);
     expect(() => tendFromServer({ ...serverTend, kind: 'Quest', openToEveryone: null })).toThrow(/who can take it on/);
   });
 
@@ -66,6 +69,7 @@ describe('server shapes', () => {
       impact: 'Large',
       energy: ['Micro', 'Brainless'],
       status: 'Active',
+      schedule: 'Every',
       frequencyDays: 2,
       ownerMemberId: 'robin',
       openToEveryone: null,
@@ -73,7 +77,7 @@ describe('server shapes', () => {
       seedLastDoneAt: '2026-10-25T09:30:00.000Z',
     });
     const quest: Quest = { id: 'q', kind: 'quest', name: 'Go to tip', tier: 'elephant', impact: 'small', energy: [], status: 'active', availableTo: ['sam'] };
-    expect(tendToServer(quest)).toMatchObject({ kind: 'Quest', roomId: null, frequencyDays: null, ownerMemberId: null, openToEveryone: false, availableTo: ['sam'] });
+    expect(tendToServer(quest)).toMatchObject({ kind: 'Quest', roomId: null, schedule: null, frequencyDays: null, ownerMemberId: null, openToEveryone: false, availableTo: ['sam'] });
   });
 
   it('patches send server values, and clearing a field sends null', () => {
@@ -91,5 +95,13 @@ describe('server shapes', () => {
     expect(memberFromServer({ ...m, sound: 'Birdsong' })).toEqual({ id: 'm', name: 'Robin', animal: '🦊', sound: 'birdsong' });
     expect(memberFromServer({ ...m, sound: 'None' }).sound).toBe('none');
     expect(() => memberFromServer({ ...m, sound: 'Klaxon' })).toThrow(/Klaxon/);
+  });
+
+  it('habits done when needed have no frequency, either way', () => {
+    const mop = tendFromServer({ ...serverTend, schedule: 'WhenNeeded', frequencyDays: null });
+    expect(mop).toMatchObject({ kind: 'habit', schedule: 'whenNeeded' });
+    expect(mop.frequencyDays).toBeUndefined();
+    expect(tendToServer(mop)).toMatchObject({ schedule: 'WhenNeeded', frequencyDays: null });
+    expect(patchToServer({ schedule: 'whenNeeded', frequencyDays: undefined })).toEqual({ schedule: 'WhenNeeded', frequencyDays: null });
   });
 });
