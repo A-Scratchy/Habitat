@@ -2,16 +2,15 @@ import { useState } from 'react';
 import { restartQuest } from '../data/actions';
 import { browse, completedQuests, NO_ROOM, pickRandom } from '../domain/selection';
 import { ENERGY, ENERGY_ORDER, KINDS, OUT_AND_ABOUT, roomIcon, TIER_ORDER, TIERS, type EffortTier, type EnergyTag, type TendKind } from '../domain/types';
-import { needOf } from '../domain/urgency';
+import { needOf, NEEDS, type Need } from '../domain/urgency';
 import { useHabitat } from './habitat';
 import { TendCard } from './TendCard';
 
 const toggle = <T,>(list: T[], item: T) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
 
-const COPY: Record<TendKind, { title: string; blurb: string; empty: string }> = {
+const COPY: Record<TendKind, { title: string; blurb?: string; empty: string }> = {
   habit: {
-    title: 'Foraging Menu',
-    blurb: 'Every habit, most needed first. Choose how you’d like to help.',
+    title: 'The Habitat',
     empty: 'No habits match that 🌳',
   },
   quest: {
@@ -21,7 +20,24 @@ const COPY: Record<TendKind, { title: string; blurb: string; empty: string }> = 
   },
 };
 
-/** Room-by-room browsing of open habits (Forage) or open quests (Quests). */
+/** Most needed first: the order a room's states are counted in. */
+const NEED_ORDER: Need[] = ['wilting', 'thirsty', 'soon', 'unknown', 'whenNeeded', 'resting'];
+
+/** How many of a room's habits are in each state, e.g. "🍂 2 · 💧 3 · 🌰 1". Only states it has. */
+function NeedCounts({ tends, now }: { tends: Parameters<typeof needOf>[0][]; now: number }) {
+  const counts = NEED_ORDER.map((need) => ({ need, n: tends.filter((t) => needOf(t, now) === need).length })).filter((c) => c.n > 0);
+  return (
+    <span className="need-counts small" aria-label={counts.map((c) => `${c.n} ${NEEDS[c.need].label.toLowerCase()}`).join(', ')}>
+      {counts.map((c) => (
+        <span key={c.need} title={NEEDS[c.need].label}>
+          {NEEDS[c.need].emoji} {c.n}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Room-by-room browsing of open habits (Habitat) or open quests (Quests). */
 export function Browse({ kind, initialRoomId }: { kind: TendKind; initialRoomId?: string }) {
   const { tends, ctx, rooms: allRooms, roomById, roomName } = useHabitat();
   const [roomId, setRoomId] = useState(initialRoomId);
@@ -38,7 +54,7 @@ export function Browse({ kind, initialRoomId }: { kind: TendKind; initialRoomId?
     .filter((r) => everything.some((t) => t.roomId === r.id))
     .map((r) => ({ id: r.id, name: r.name, icon: roomIcon(r) }));
   if (everything.some((t) => !t.roomId)) rooms.push({ id: NO_ROOM, ...OUT_AND_ABOUT });
-  // Habits start from "Where are you?"; quests show the whole list, with rooms as an optional filter.
+  // Habits start from the room tiles; quests show the whole list, with rooms as an optional filter.
   const choosingRoom = kind === 'habit' && !roomId && !query.trim();
   const results = choosingRoom ? [] : browse(tends, ctx, kind, { ...filter, roomId }, roomName);
   const room = roomId === NO_ROOM ? OUT_AND_ABOUT : roomId ? { name: roomById.get(roomId)?.name ?? '', icon: roomIcon(roomById.get(roomId)) } : undefined;
@@ -48,7 +64,7 @@ export function Browse({ kind, initialRoomId }: { kind: TendKind; initialRoomId?
     <section className="screen">
       <header className="screen-head">
         <h2>{copy.title}</h2>
-        <p className="muted">{copy.blurb}</p>
+        {copy.blurb && <p className="muted">{copy.blurb}</p>}
       </header>
 
       {kind === 'quest' && (
@@ -67,27 +83,32 @@ export function Browse({ kind, initialRoomId }: { kind: TendKind; initialRoomId?
         </>
       )}
 
-      <input
-        className="search"
-        type="search"
-        placeholder={kind === 'habit' ? 'Search, e.g. “sink” or “feed”' : 'Search, e.g. “tip” or “shop”'}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        aria-label={`Search ${KINDS[kind].plural.toLowerCase()}`}
-      />
+      {/* The Habitat is for seeing how each room is doing; searching and filtering live in Forage. */}
+      {kind === 'quest' && (
+        <>
+          <input
+            className="search"
+            type="search"
+            placeholder="Search, e.g. “tip” or “shop”"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label={`Search ${KINDS[kind].plural.toLowerCase()}`}
+          />
 
-      <div className="chips" role="group" aria-label="Effort and energy filters">
-        {TIER_ORDER.map((t) => (
-          <button key={t} className={`chip${tiers.includes(t) ? ' on' : ''}`} aria-pressed={tiers.includes(t)} onClick={() => setTiers(toggle(tiers, t))}>
-            {TIERS[t].emoji} {TIERS[t].label}
-          </button>
-        ))}
-        {ENERGY_ORDER.map((e) => (
-          <button key={e} className={`chip${energy.includes(e) ? ' on' : ''}`} aria-pressed={energy.includes(e)} onClick={() => setEnergy(toggle(energy, e))}>
-            {ENERGY[e].emoji} {ENERGY[e].label}
-          </button>
-        ))}
-      </div>
+          <div className="chips" role="group" aria-label="Effort and energy filters">
+            {TIER_ORDER.map((t) => (
+              <button key={t} className={`chip${tiers.includes(t) ? ' on' : ''}`} aria-pressed={tiers.includes(t)} onClick={() => setTiers(toggle(tiers, t))}>
+                {TIERS[t].emoji} {TIERS[t].label}
+              </button>
+            ))}
+            {ENERGY_ORDER.map((e) => (
+              <button key={e} className={`chip${energy.includes(e) ? ' on' : ''}`} aria-pressed={energy.includes(e)} onClick={() => setEnergy(toggle(energy, e))}>
+                {ENERGY[e].emoji} {ENERGY[e].label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {kind === 'quest' && rooms.length > 0 && (
         <div className="chips" role="group" aria-label="Filter by room (optional)">
@@ -104,12 +125,10 @@ export function Browse({ kind, initialRoomId }: { kind: TendKind; initialRoomId?
 
       {choosingRoom ? (
         <>
-          <h3 className="section-title">Where are you?</h3>
           {rooms.length === 0 && <p className="empty">{kind === 'habit' ? 'No habits yet. Add some in the Tending tab.' : 'No open quests. Add one in the Tending tab.'}</p>}
           <div className="rooms">
             {rooms.map((r) => {
               const here = everything.filter((t) => (r.id === NO_ROOM ? !t.roomId : t.roomId === r.id));
-              const thirsty = here.filter((t) => ['thirsty', 'wilting'].includes(needOf(t, ctx.now))).length;
               const noun = here.length === 1 ? KINDS[kind].label.toLowerCase() : KINDS[kind].plural.toLowerCase();
               return (
                 <button key={r.id} className="room-tile" onClick={() => setRoomId(r.id)}>
@@ -119,12 +138,15 @@ export function Browse({ kind, initialRoomId }: { kind: TendKind; initialRoomId?
                   <span className="room-name">{r.name}</span>
                   <span className="muted small">
                     {here.length} {noun}
-                    {thirsty > 0 ? ` · ${thirsty} 💧` : ''}
                   </span>
+                  {kind === 'habit' && <NeedCounts tends={here} now={ctx.now} />}
                 </button>
               );
             })}
           </div>
+          {kind === 'habit' && rooms.length > 0 && (
+            <p className="muted small center-text">{NEED_ORDER.map((n) => `${NEEDS[n].emoji} ${NEEDS[n].label}`).join(' · ')}</p>
+          )}
         </>
       ) : (
         <>

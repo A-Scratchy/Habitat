@@ -23,7 +23,7 @@ export function TendCard({ tend, big = false }: { tend: Tend; big?: boolean }) {
   const tier = TIERS[tend.tier];
   const last = lastDoneLabel(tend, ctx.now);
 
-  // Fade out, log, then fade back in: lists that keep done tends (Forage) just re-sort it.
+  // Fade out, log, then fade back in: lists that keep done tends (a room in the Habitat) just re-sort it.
   const finish = (ids: string[]) => {
     setLeaving(true);
     setTimeout(

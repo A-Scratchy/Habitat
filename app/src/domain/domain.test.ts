@@ -93,7 +93,15 @@ describe('selection', () => {
     const elephant = habit({ tier: 'elephant', frequencyDays: 30, lastDone: daysAgo(31) });
     const sloth = habit({ tier: 'sloth', frequencyDays: 2, lastDone: daysAgo(3) });
     const all = [tortoiseNext, beeResting, beeUnknown, elephant, tortoiseTop, tortoiseSoon, sloth];
-    expect(quickSet(all, ctx).map((t) => t.id)).toEqual([sloth.id, tortoiseTop.id, elephant.id]);
+    // Bee has nothing due, so it offers the habit nobody has logged yet.
+    expect(quickSet(all, ctx).map((t) => t.id)).toEqual([sloth.id, tortoiseTop.id, beeUnknown.id, elephant.id]);
+  });
+
+  it('quick set: a never-logged habit only fills a tier with nothing due', () => {
+    const due = habit({ tier: 'bee', frequencyDays: 7, lastDone: daysAgo(8) });
+    const unknownA = habit({ tier: 'bee', name: 'A never logged', frequencyDays: 7 });
+    const unknownB = habit({ tier: 'sloth', name: 'B never logged', frequencyDays: 7 });
+    expect(quickSet([unknownA, due, unknownB], ctx).map((t) => t.id)).toEqual([unknownB.id, due.id]);
   });
 
   it('quick set: "different set" steps each tier along and wraps', () => {

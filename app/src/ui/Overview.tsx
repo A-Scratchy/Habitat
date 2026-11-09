@@ -4,6 +4,8 @@ import { habitatHealth, HEALTH, packTotals, roomHealth, type Health } from '../d
 import { roomIcon, type Room } from '../domain/types';
 import { useHabitat } from './habitat';
 import { WinsFeed } from './WinsFeed';
+import { BerryJar, BountyBoard } from './Bounties';
+import { GiftsForYou } from './Gifts';
 
 /** A soft bar for a health score; no bar when there's nothing to judge yet. */
 function HealthBar({ health }: { health: Health }) {
@@ -55,6 +57,11 @@ export function Overview({ onOpenRoom }: { onOpenRoom(room: Room): void }) {
         ))}
       </div>
       <p className="muted small center-text">Things the pack looked after, together 🐾</p>
+      <BerryJar />
+
+      <GiftsForYou />
+
+      <BountyBoard />
 
       <h3 className="section-title">Rooms</h3>
       {rooms.length === 0 ? (

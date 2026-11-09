@@ -27,6 +27,13 @@ export interface Claim {
   day: string;
 }
 
+/** On the bounty board: important, can't be done right now, and worth acorns to whoever does it next. */
+export interface Bounty {
+  acorns: number;
+  /** Epoch ms. Only doing it at or after this pays the bounty. */
+  postedAt: number;
+}
+
 /** Omit that keeps a union a union (plain Omit would merge Habit and Quest into one loose type). */
 export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
@@ -44,6 +51,7 @@ interface TendBase {
   /** Epoch ms. Missing means "not yet known", which is never treated as overdue. */
   lastDone?: number;
   claim?: Claim;
+  bounty?: Bounty;
 }
 
 interface HabitBase extends TendBase {
@@ -114,6 +122,23 @@ export interface Win {
   prevLastDone?: number;
   /** True when this win finished a quest, so undo can put it back on the open list. */
   completedQuest?: boolean;
+  /** Acorns from a bounty this win paid, split between everyone on it. Undo puts the bounty back up. */
+  bounty?: number;
+}
+
+export type GiftKind = 'hug' | 'highFive' | 'thankYou';
+export const GIFT_ORDER: GiftKind[] = ['hug', 'highFive', 'thankYou'];
+
+/** Something kind sent to someone in the pack, paid for in acorns. Shown once, only to whoever it's for. */
+export interface Gift {
+  id: string;
+  kind: GiftKind;
+  fromId: string;
+  toId: string;
+  /** What it cost the sender. */
+  acorns: number;
+  sentAt: number;
+  seenAt?: number;
 }
 
 export const DESCRIPTION_MAX = 1000;

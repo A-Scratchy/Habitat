@@ -6,6 +6,7 @@ import { saveMember } from '../data/actions';
 import { useHabitat } from './habitat';
 import { ConfirmButton } from './Confirm';
 import { AnimalPicker, SoundPicker } from './Members';
+import { useTotals } from './Bounties';
 
 /** The header avatar's menu: who you are on this device, and your sign-in. */
 export function ProfileSheet({ onClose, onOpenAccountSettings }: { onClose(): void; onOpenAccountSettings(): void }) {
@@ -14,6 +15,7 @@ export function ProfileSheet({ onClose, onOpenAccountSettings }: { onClose(): vo
   const sheet = useRef<HTMLDivElement>(null);
   const account = signedInAccount();
   const connection = readConnection();
+  const totals = useTotals();
 
   useEffect(() => {
     sheet.current?.focus();
@@ -40,6 +42,13 @@ export function ProfileSheet({ onClose, onOpenAccountSettings }: { onClose(): vo
             ✕
           </button>
         </header>
+
+        {totals?.acorns !== undefined && (
+          <div className="panel">
+            🌰 <strong>{totals.acorns.toLocaleString()}</strong> acorns in your purse
+            <p className="muted small">Everything you do earns acorns by effort (🦥 1 · 🐢 2 · 🐝 3 · 🐘 5), plus any bounty on it. Just for fun, and only you see yours.</p>
+          </div>
+        )}
 
         <form
           className="stack"

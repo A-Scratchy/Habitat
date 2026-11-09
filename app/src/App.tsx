@@ -8,12 +8,15 @@ import { isRemote, setRemote, useSyncStatus } from './data/remote';
 import { SyncBanner, useAutoSync } from './ui/SyncBanner';
 import { Meadow } from './meadow/Meadow';
 import { Browse } from './ui/Browse';
+import { Forage } from './ui/Forage';
 import { BusyScreen } from './ui/Busy';
 import { DemoBanner } from './ui/Demo';
 import { Tending } from './ui/Tending';
 import { HabitatProvider, useHabitat, writeLocal } from './ui/habitat';
 import { WhoIsHere } from './ui/Members';
 import { ProfileSheet } from './ui/Profile';
+import { AcornPurse } from './ui/Bounties';
+import { PurseSheet } from './ui/Gifts';
 import { QuickChoice } from './ui/QuickChoice';
 import { QuickWins } from './ui/QuickWins';
 import { Settings, type SettingsTab } from './ui/Settings';
@@ -22,9 +25,10 @@ import { Overview } from './ui/Overview';
 import { Welcome } from './ui/Welcome';
 
 const TABS = [
-  { id: 'habitat', icon: '🏡', label: 'Habitat' },
+  { id: 'home', icon: '🏡', label: 'Home' },
   { id: 'quick', icon: '🍃', label: 'Quick' },
   { id: 'sloth', icon: '🦥', label: 'Sloth' },
+  { id: 'habitat', icon: '🌳', label: 'Habitat' },
   { id: 'forage', icon: '🍄', label: 'Forage' },
   { id: 'quests', icon: '🗺️', label: 'Quests' },
   { id: 'tending', icon: '🌱', label: 'Tending' },
@@ -35,14 +39,16 @@ type TabId = (typeof TABS)[number]['id'] | 'settings';
 function Main() {
   const { me } = useHabitat();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [purseOpen, setPurseOpen] = useState(false);
+  const closePurse = useCallback(() => setPurseOpen(false), []);
   const closeProfile = useCallback(() => setProfileOpen(false), []);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>();
-  // Always opens on the Habitat overview: how the home is doing and what the pack has done.
-  const [tab, setTabState] = useState<TabId>('habitat');
-  /** Set when a room tile on the overview opens that room in Forage. */
-  const [forageRoomId, setForageRoomId] = useState<string>();
+  // Always opens on Home: how the habitat is doing and what the pack has done.
+  const [tab, setTabState] = useState<TabId>('home');
+  /** Set when a room tile on Home opens that room in the Habitat tab. */
+  const [habitatRoomId, setHabitatRoomId] = useState<string>();
   const setTab = (t: TabId) => {
-    if (t !== 'forage') setForageRoomId(undefined);
+    if (t !== 'habitat') setHabitatRoomId(undefined);
     setTabState(t);
     window.scrollTo({ top: 0 });
   };
@@ -54,6 +60,7 @@ function Main() {
       <header className="topbar">
         <span className="brand">🌿 Our Habitat</span>
         <div className="topbar-actions">
+          <AcornPurse onOpen={() => setPurseOpen(true)} />
           <button className={`icon-btn${profileOpen ? ' on' : ''}`} onClick={() => setProfileOpen(true)} title={me.name} aria-label={`${me.name}: profile and sign-in`}>
             {me.animal}
           </button>
@@ -74,21 +81,24 @@ function Main() {
       {isRemote() && <SyncBanner />}
 
       <main>
-        {tab === 'habitat' && (
+        {tab === 'home' && (
           <Overview
             onOpenRoom={(room) => {
-              setForageRoomId(room.id);
-              setTab('forage');
+              setHabitatRoomId(room.id);
+              setTab('habitat');
             }}
           />
         )}
         {tab === 'quick' && <QuickChoice />}
         {tab === 'sloth' && <QuickWins />}
-        {tab === 'forage' && <Browse key={`habit-${forageRoomId ?? ''}`} kind="habit" initialRoomId={forageRoomId} />}
+        {tab === 'habitat' && <Browse key={`habit-${habitatRoomId ?? ''}`} kind="habit" initialRoomId={habitatRoomId} />}
+        {tab === 'forage' && <Forage />}
         {tab === 'quests' && <Browse key="quest" kind="quest" />}
         {tab === 'tending' && <Tending />}
         {tab === 'settings' && <Settings key={settingsTab} initialTab={settingsTab} />}
       </main>
+
+      {purseOpen && <PurseSheet onClose={closePurse} />}
 
       {profileOpen && (
         <ProfileSheet

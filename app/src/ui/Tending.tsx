@@ -585,7 +585,7 @@ function RoomsAdmin() {
       <button className="btn-done" onClick={() => setEditing('new')}>
         ＋ Add a room
       </button>
-      <p className="muted small">The order here is the order everywhere: the Habitat overview, Forage and Quests.</p>
+      <p className="muted small">The order here is the order everywhere: Home, the Habitat and Quests.</p>
       {error && <p className="small error-text">{error}</p>}
       {rooms.length === 0 && <p className="empty">No rooms yet.</p>}
       <ul className="admin-list">

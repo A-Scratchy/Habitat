@@ -11,7 +11,7 @@ interface ChartBar {
   label: string;
   /** Undefined: nothing to show for that period. */
   value?: number;
-  /** What the value reads as, e.g. "42 acorns". */
+  /** What the value reads as, e.g. "42 berries". */
   text: string;
   current: boolean;
 }
@@ -69,7 +69,8 @@ function Meter({ label, value, max, text, strong }: { label: string; value: numb
   );
 }
 
-const acorns = (n: number) => `${roundAcorns(n)} ${roundAcorns(n) === 1 ? 'acorn' : 'acorns'}`;
+/** The pack's effort is counted in berries, the shared currency; acorns are personal. */
+const berriesText = (n: number) => `${roundAcorns(n)} ${roundAcorns(n) === 1 ? 'berry' : 'berries'}`;
 
 function PackView({ period, wins }: { period: Period; wins: Parameters<typeof packReport>[0] }) {
   const { tends, rooms, ctx } = useHabitat();
@@ -82,23 +83,23 @@ function PackView({ period, wins }: { period: Period; wins: Parameters<typeof pa
   return (
     <div className="stack">
       <div className="panel rpt-hero">
-        <strong>{r.acorns} 🌰</strong>
+        <strong>{r.acorns} 🫐</strong>
         <span>
-          acorns of care {p.this} · {r.done} {r.done === 1 ? 'thing' : 'things'} done
+          berries of care {p.this} · {r.done} {r.done === 1 ? 'thing' : 'things'} done
         </span>
         <span className="muted small">{comparison(r)}</span>
       </div>
 
       <BarChart
-        title={`The pack’s acorns, last ${p.bars} ${period === 'day' ? 'days' : period === 'week' ? 'weeks' : 'months'}`}
-        bars={r.bars.map((b) => ({ key: String(b.start), label: b.current ? (period === 'day' ? 'Today' : 'Now') : b.label, value: b.acorns, text: `${acorns(b.acorns)}, ${b.done} done`, current: b.current }))}
+        title={`The pack’s berries, last ${p.bars} ${period === 'day' ? 'days' : period === 'week' ? 'weeks' : 'months'}`}
+        bars={r.bars.map((b) => ({ key: String(b.start), label: b.current ? (period === 'day' ? 'Today' : 'Now') : b.label, value: b.acorns, text: `${berriesText(b.acorns)}, ${b.done} done`, current: b.current }))}
       />
 
       <h3 className="section-title">Where the care went</h3>
       {r.rooms.length ? (
         <div className="panel stack">
           {r.rooms.map((x) => (
-            <Meter key={x.key} label={`${x.icon} ${x.name}`} value={x.acorns} max={roomMax} text={`${acorns(x.acorns)} · ${x.done} done`} />
+            <Meter key={x.key} label={`${x.icon} ${x.name}`} value={x.acorns} max={roomMax} text={`${berriesText(x.acorns)} · ${x.done} done`} />
           ))}
         </div>
       ) : (
@@ -108,7 +109,7 @@ function PackView({ period, wins }: { period: Period; wins: Parameters<typeof pa
       <h3 className="section-title">Big jobs and small</h3>
       <div className="panel stack">
         {r.tiers.map((t) => (
-          <Meter key={t.tier} label={`${TIERS[t.tier].emoji} ${TIERS[t.tier].label}`} value={t.acorns} max={tierMax} text={`${t.done} done · ${acorns(t.acorns)}`} />
+          <Meter key={t.tier} label={`${TIERS[t.tier].emoji} ${TIERS[t.tier].label}`} value={t.acorns} max={tierMax} text={`${t.done} done · ${berriesText(t.acorns)}`} />
         ))}
         {r.acorns > 0 && small > 0 && (
           <p className="muted small">
@@ -140,7 +141,7 @@ function PackView({ period, wins }: { period: Period; wins: Parameters<typeof pa
       )}
 
       <p className="muted small center-text">
-        Acorns weigh effort: {TIER_ORDER.map((t) => `${TIERS[t].emoji} ${TIER_ACORNS[t]}`).join(' · ')}
+        Berries weigh effort: {TIER_ORDER.map((t) => `${TIERS[t].emoji} ${TIER_ACORNS[t]}`).join(' · ')}
       </p>
     </div>
   );
@@ -162,7 +163,7 @@ function ShareView({ period, wins }: { period: Period; wins: Parameters<typeof p
           <>
             <strong>{pct(mine.acorns / r.total)}</strong>
             <span>
-              your share of the pack’s {acorns(r.total)} {p.this}
+              your share of the pack’s {berriesText(r.total)} {p.this}
             </span>
           </>
         ) : (
@@ -179,10 +180,10 @@ function ShareView({ period, wins }: { period: Period; wins: Parameters<typeof p
             label={`${m.member.animal} ${m.member.name}${m.member.id === focusId ? ' (you)' : ''}`}
             value={m.acorns}
             max={max}
-            text={`${acorns(m.acorns)} · ${m.done} done`}
+            text={`${berriesText(m.acorns)} · ${m.done} done`}
           />
         ))}
-        <p className="muted small">A job done together splits its acorns between everyone tagged.</p>
+        <p className="muted small">A job done together splits its berries between everyone tagged.</p>
       </div>
 
       <BarChart

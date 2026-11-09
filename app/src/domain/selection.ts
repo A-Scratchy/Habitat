@@ -47,17 +47,36 @@ export function myClaims(tends: Tend[], ctx: ViewContext): Tend[] {
 }
 
 /**
- * One tend per effort tier, each the most-needed of its tier by schedule.
+ * One tend per effort tier, each the most-needed of its tier by schedule. A tier with nothing due
+ * offers a habit nobody has logged yet instead (alphabetical), so those still get picked up
+ * without ever pushing ahead of something that's due.
  * `round` steps each tier to its next candidate, wrapping, for "show me a different set".
  */
 export function quickSet(tends: Tend[], ctx: ViewContext, round = 0): Tend[] {
-  const pool = dailyPool(tends, ctx)
-    .filter((t) => !isHandsOff(t, ctx) && ['soon', 'thirsty', 'wilting'].includes(needOf(t, ctx.now)))
+  const open = dailyPool(tends, ctx).filter((t) => !isHandsOff(t, ctx));
+  const due = open
+    .filter((t) => ['soon', 'thirsty', 'wilting'].includes(needOf(t, ctx.now)))
     .sort((a, b) => needRatio(b, ctx.now)! - needRatio(a, ctx.now)! || a.name.localeCompare(b.name));
+  const neverLogged = open.filter((t) => needOf(t, ctx.now) === 'unknown').sort((a, b) => a.name.localeCompare(b.name));
   return TIER_ORDER.flatMap((tier) => {
-    const ofTier = pool.filter((t) => t.tier === tier);
+    const dueOfTier = due.filter((t) => t.tier === tier);
+    const ofTier = dueOfTier.length ? dueOfTier : neverLogged.filter((t) => t.tier === tier);
     return ofTier.length ? [ofTier[round % ofTier.length]] : [];
   });
+}
+
+/** Everything that needs doing (thirsty or wilting), most needed first: the Forage list. */
+export function needsDoing(tends: Tend[], ctx: ViewContext): Tend[] {
+  return dailyPool(tends, ctx)
+    .filter((t) => ['thirsty', 'wilting'].includes(needOf(t, ctx.now)))
+    .sort((a, b) => needRatio(b, ctx.now)! - needRatio(a, ctx.now)! || a.name.localeCompare(b.name));
+}
+
+/** Habits nobody has logged yet, alphabetical. */
+export function neverLogged(tends: Tend[], ctx: ViewContext): Tend[] {
+  return dailyPool(tends, ctx)
+    .filter((t) => needOf(t, ctx.now) === 'unknown')
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Open quests the current member can take on, not claimed by someone else. */
@@ -106,7 +125,7 @@ export function matchesQuery(t: Tend, query: string, roomName = ''): boolean {
 }
 
 /**
- * Open habits (Forage) or open quests (Quests), most urgent first. Nothing is hidden for being
+ * Open habits (Habitat) or open quests (Quests), most urgent first. Nothing is hidden for being
  * recently done, since some habits need doing again sooner than their schedule says. Paused tends
  * and finished quests never show here (they live in the Tending tab and the Completed shelf).
  */

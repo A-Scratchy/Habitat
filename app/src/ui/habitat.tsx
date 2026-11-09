@@ -92,13 +92,15 @@ export function HabitatProvider({ children, loading }: { children: (state: 'load
       // Ready the sound while this is still the tap: browsers won't start audio after the wait.
       primeSound();
       const winIds = await completeTends(tendIds, memberIds, opts.at);
+      const bounty = (await db.wins.bulkGet(winIds)).reduce((n, w) => n + (w?.bounty ?? 0), 0);
       // The sound of whoever's using this device, once it's actually saved.
       const sound = members?.find((m) => m.id === meId)?.sound;
       if (sound) playSound(sound);
       celebrate();
       const quest = tendIds.length === 1 && tends?.find((x) => x.id === tendIds[0])?.kind === 'quest';
-      const message =
-        quest
+      const message = bounty
+        ? `Bounty done! 🌰 ${bounty} acorns${memberIds.length > 1 ? ', shared between you' : ''} 📜`
+        : quest
           ? 'Quest complete! 🏆 It’s on the Completed shelf.'
           : winIds.length > 1
           ? `${winIds.length} done in one sweep! 🚀`

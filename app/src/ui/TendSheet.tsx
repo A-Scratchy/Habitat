@@ -3,6 +3,7 @@ import { setFrequency, updateTend, type CommonTendFields } from '../data/actions
 import { DAY, dayKey, parseDay } from '../domain/dates';
 import { DESCRIPTION_MAX, IMPACT_ORDER, IMPACTS, KINDS, OUT_AND_ABOUT, STATUSES, TIER_ORDER, TIERS, type Tend, type TendStatus } from '../domain/types';
 import { useHabitat } from './habitat';
+import { BountyPanel } from './Bounties';
 
 type When = 'today' | 'yesterday' | 'twoDays' | 'pick';
 
@@ -218,6 +219,7 @@ export function TendSheet({ tend, defaultWho, onClose }: { tend: Tend; defaultWh
         </header>
         {view === 'log' && live.description && <Description text={live.description} />}
         {view === 'log' ? <LogPanel tend={live} defaultWho={defaultWho} onClose={onClose} /> : <TweakPanel tend={live} />}
+        {view === 'log' && !(live.kind === 'quest' && live.completedAt != null) && <BountyPanel tend={live} onDone={onClose} />}
       </div>
     </div>
   );

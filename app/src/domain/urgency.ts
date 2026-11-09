@@ -4,7 +4,7 @@ import type { Tend } from './types';
 export type Need = 'unknown' | 'resting' | 'soon' | 'thirsty' | 'wilting' | 'whenNeeded';
 
 export const NEEDS: Record<Need, { emoji: string; label: string }> = {
-  unknown: { emoji: '🌰', label: 'Not yet known' },
+  unknown: { emoji: '🥚', label: 'Not logged yet' },
   resting: { emoji: '🌳', label: 'Flourishing' },
   soon: { emoji: '🌿', label: 'Getting ready' },
   thirsty: { emoji: '💧', label: 'Thirsty' },

@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import { DEFAULT_SOUND, type Member, type Room, type Tend, type Win } from '../domain/types';
+import { DEFAULT_SOUND, type Gift, type Member, type Room, type Tend, type Win } from '../domain/types';
 
 type HabitatDexie = Dexie & {
   rooms: EntityTable<Room, 'id'>;
@@ -7,7 +7,22 @@ type HabitatDexie = Dexie & {
   members: EntityTable<Member, 'id'>;
   wins: EntityTable<Win, 'id'>;
   meta: EntityTable<{ key: string; value: string }, 'key'>;
+  outbox: EntityTable<OutboxOp, 'seq'>;
+  gifts: EntityTable<Gift, 'id'>;
 };
+
+/**
+ * A change saved on this device that still has to reach the server, in the order it was made.
+ * Stored as the request itself, so sending it later needs nothing else from the device.
+ */
+export interface OutboxOp {
+  seq?: number;
+  method: 'PUT' | 'PATCH' | 'POST' | 'DELETE';
+  path: string;
+  body?: unknown;
+  /** What it was, for the banner if the server says no: e.g. "Ticking off “Wipe sink”". */
+  what: string;
+}
 
 /** Used when sign-in isn't configured, and by the prototype before habitats existed. */
 const LOCAL_ONLY = 'household-ecosystem';
@@ -120,6 +135,25 @@ function open(name: string): HabitatDexie {
           else delete ref.value;
         });
     });
+  // Changes are saved here first and sent to the server from this queue, so taps never wait on it.
+  d.version(8).stores({
+    rooms: 'id, name',
+    tends: 'id, kind, status, roomId',
+    members: 'id',
+    wins: 'id, at',
+    meta: 'key',
+    outbox: '++seq',
+  });
+  // Hugs, high-fives and thank yous, bought with acorns.
+  d.version(9).stores({
+    rooms: 'id, name',
+    tends: 'id, kind, status, roomId',
+    members: 'id',
+    wins: 'id, at',
+    meta: 'key',
+    outbox: '++seq',
+    gifts: 'id, toId',
+  });
   return d;
 }
 

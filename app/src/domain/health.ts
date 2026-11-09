@@ -9,7 +9,7 @@ export const HEALTH: Record<HealthLevel, { emoji: string; label: string }> = {
   healthy: { emoji: '🌿', label: 'Healthy' },
   thirsty: { emoji: '💧', label: 'Thirsty' },
   wilting: { emoji: '🍂', label: 'Wilting' },
-  unknown: { emoji: '🌰', label: 'Not yet known' },
+  unknown: { emoji: '🥚', label: 'Not yet known' },
   resting: { emoji: '🌱', label: 'Nothing scheduled' },
 };
 

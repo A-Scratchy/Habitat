@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
 import { dismissProblem, syncNow, useSyncStatus } from '../data/remote';
 
@@ -36,15 +37,25 @@ export function useAutoSync(householdId: string | undefined): boolean {
   return ready;
 }
 
-/** Says so, gently, when the server can't be reached or a change wasn't saved. */
+/** Says so, gently, when the server can't be reached or a change didn't reach it. */
 export function SyncBanner() {
-  const { online, problem } = useSyncStatus();
-  if (online && !problem) return null;
+  const { online, waiting, problem } = useSyncStatus();
+  const queued = useLiveQuery(() => db.outbox.count(), []) ?? 0;
+  if (online && !waiting && !problem) return null;
+  const kept = queued === 1 ? '1 change is saved on this device' : queued ? `${queued} changes are saved on this device` : '';
+  const message =
+    problem ??
+    (!online
+      ? `📡 Can’t reach the habitat right now. ${kept ? `${kept} and will send` : 'Anything you change is saved on this device and sends'} once it’s back.`
+      : kept
+        ? `🌱 The habitat is slow to answer. ${kept} and will send on its own.`
+        : null);
+  if (!message) return null;
   return (
     <div className="demo-banner sync-banner" role="status">
-      <span>{problem ?? '📡 Can’t reach the habitat right now. You’re seeing what this device last saw; changes can’t be saved until it’s back.'}</span>
+      <span>{message}</span>
       <button className="btn-soft" onClick={() => (problem ? dismissProblem() : void syncNow())}>
-        {problem ? 'OK' : 'Try again'}
+        {problem ? 'OK' : 'Try now'}
       </button>
     </div>
   );
