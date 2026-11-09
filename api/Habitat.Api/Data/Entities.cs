@@ -196,6 +196,10 @@ public class Tend : HouseholdEntity, ISynced
     public Guid? ClaimMemberId { get; set; }
     /// <summary>Household-local date the claim is for. A claim from another day has lapsed.</summary>
     public DateOnly? ClaimDay { get; set; }
+    /// <summary>On the bounty board: acorns for whoever does it next. Paid out (and cleared) by the first win after it was posted.</summary>
+    public int? BountyAcorns { get; set; }
+    /// <summary>When the bounty went up. Only a win done at or after this pays it.</summary>
+    public DateTimeOffset? BountyPostedAt { get; set; }
     /// <summary>A "last done" date brought in by import, before any wins existed.</summary>
     public DateTimeOffset? SeedLastDoneAt { get; set; }
     /// <summary>Owned by the server: the later of the seed date and the latest non-deleted win. Devices never write it.</summary>
@@ -224,6 +228,8 @@ public class Win : HouseholdEntity, ISynced
     public List<WinMember> Members { get; set; } = [];
     /// <summary>True when this win finished a quest, so undoing it puts the quest back on the open list.</summary>
     public bool CompletedQuest { get; set; }
+    /// <summary>The bounty this win paid, split between everyone who did it; 0 for none. Undoing the win puts the bounty back up.</summary>
+    public int BountyAcorns { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
     public long RowVersion { get; set; }
@@ -236,6 +242,26 @@ public class QuestMember
 }
 
 /// <summary>Everyone credited with a win. The first-tagged person is primary.</summary>
+public enum GiftKind { Hug, HighFive, ThankYou }
+
+/// <summary>
+/// Something kind sent from one member to another, paid for in acorns (just for fun). Only the person
+/// it's for is shown it, once; the sender never sees whether it's been seen, so there's nothing to answer.
+/// </summary>
+public class Gift : HouseholdEntity, ISynced
+{
+    public GiftKind Kind { get; set; }
+    public Guid FromMemberId { get; set; }
+    public Guid ToMemberId { get; set; }
+    /// <summary>What it cost the sender, at the app's price when it was sent.</summary>
+    public int Acorns { get; set; }
+    public DateTimeOffset SentAt { get; set; }
+    public DateTimeOffset? SeenAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
+    public long RowVersion { get; set; }
+}
+
 public class WinMember
 {
     public Guid MemberId { get; set; }

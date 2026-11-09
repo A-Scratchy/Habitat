@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Habitat.Api.Auth;
 using Habitat.Api.Data;
+using Habitat.Api.Features.Gifts;
 using Habitat.Api.Features.Devices;
 using Habitat.Api.Features.Tends;
 using Habitat.Api.Features.Households;
@@ -76,6 +77,7 @@ api.MapMemberEndpoints();
 api.MapRoomEndpoints();
 api.MapTendEndpoints();
 api.MapWinEndpoints();
+api.MapGiftEndpoints();
 api.MapSyncEndpoints();
 api.MapPresenceEndpoints();
 

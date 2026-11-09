@@ -252,6 +252,89 @@ public class TendWinSyncTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task Bounties_pay_the_next_win_and_go_back_up_on_undo()
+    {
+        var (_, device, robin, habitId) = await Setup();
+        var sam = Guid.NewGuid();
+        (await device.PutAsJsonAsync($"/api/members/{sam}", new { name = "Sam", animal = "🦊", sound = "Chime" }, Json.Options)).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PutAsJsonAsync($"/api/tends/{habitId}/bounty", new BountyRequest(0), Json.Options)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PutAsJsonAsync($"/api/tends/{habitId}/bounty", new BountyRequest(51), Json.Options)).StatusCode);
+        (await device.PutAsJsonAsync($"/api/tends/{habitId}/bounty", new BountyRequest(10), Json.Options)).EnsureSuccessStatusCode();
+        var posted = await Tend(device, habitId);
+        Assert.Equal((int?)10, posted.BountyAcorns);
+
+        // Logging that it was done before the bounty went up doesn't claim it.
+        var backdated = Guid.NewGuid();
+        (await LogWin(device, habitId, [robin], api.Clock.GetUtcNow().AddDays(-1), backdated)).EnsureSuccessStatusCode();
+        Assert.Equal((int?)10, (await Tend(device, habitId)).BountyAcorns);
+
+        var paid = Guid.NewGuid();
+        (await LogWin(device, habitId, [robin, sam], winId: paid)).EnsureSuccessStatusCode();
+        var sync = await Sync(device);
+        Assert.Null(sync.Tends.Single(t => t.Id == habitId).BountyAcorns);
+        Assert.Equal((0, 10), (sync.Wins.Single(w => w.Id == backdated).BountyAcorns, sync.Wins.Single(w => w.Id == paid).BountyAcorns));
+
+        (await device.DeleteAsync($"/api/wins/{paid}")).EnsureSuccessStatusCode();
+        Assert.Equal((int?)10, (await Tend(device, habitId)).BountyAcorns);
+        (await device.DeleteAsync($"/api/tends/{habitId}/bounty")).EnsureSuccessStatusCode();
+        Assert.Null((await Tend(device, habitId)).BountyAcorns);
+    }
+
+    [Fact]
+    public async Task A_first_sync_totals_the_older_wins_it_leaves_out()
+    {
+        var (_, device, robin, habitId) = await Setup();
+        var sam = Guid.NewGuid();
+        (await device.PutAsJsonAsync($"/api/members/{sam}", new { name = "Sam", animal = "🦊", sound = "Chime" }, Json.Options)).EnsureSuccessStatusCode();
+        (await device.PutAsJsonAsync($"/api/tends/{habitId}/bounty", new BountyRequest(6), Json.Options)).EnsureSuccessStatusCode();
+        var longAgo = api.Clock.GetUtcNow();
+        // In steps, using the device each time, so it isn't forgotten as unused.
+        for (var i = 0; i < 4; i++)
+        {
+            api.Clock.Advance(TimeSpan.FromDays(50));
+            await Sync(device);
+        }
+        (await LogWin(device, habitId, [robin, sam], longAgo.AddHours(1))).EnsureSuccessStatusCode();
+        (await LogWin(device, habitId, [robin], longAgo.AddHours(2))).EnsureSuccessStatusCode();
+        (await LogWin(device, habitId, [robin])).EnsureSuccessStatusCode();
+
+        var sync = await Sync(device);
+        Assert.Single(sync.Wins);
+        var earlier = sync.Earlier!;
+        Assert.Equal([new TierCount(EffortTier.Tortoise, 2)], earlier.Tiers);
+        Assert.Equal(1.5, earlier.Shares.Single(s => s.MemberId == robin).Share);
+        Assert.Equal(0.5, earlier.Shares.Single(s => s.MemberId == sam).Share);
+        Assert.Equal(3, earlier.Bounties.Single(b => b.MemberId == sam).Acorns);
+        Assert.Null((await Sync(device, sync.Cursor)).Earlier);
+    }
+
+    [Fact]
+    public async Task Gifts_are_sent_once_and_seen_by_whoever_they_are_for()
+    {
+        var (_, device, robin, _) = await Setup();
+        var sam = Guid.NewGuid();
+        (await device.PutAsJsonAsync($"/api/members/{sam}", new { name = "Sam", animal = "🦊", sound = "Chime" }, Json.Options)).EnsureSuccessStatusCode();
+        var now = api.Clock.GetUtcNow();
+        var id = Guid.NewGuid();
+        var hug = new Habitat.Api.Features.Gifts.GiftInput(GiftKind.Hug, robin, sam, 3, now);
+        (await device.PutAsJsonAsync($"/api/gifts/{id}", hug, Json.Options)).EnsureSuccessStatusCode();
+        // An outbox retry changes nothing.
+        (await device.PutAsJsonAsync($"/api/gifts/{id}", hug, Json.Options)).EnsureSuccessStatusCode();
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PutAsJsonAsync($"/api/gifts/{Guid.NewGuid()}", hug with { ToMemberId = robin }, Json.Options)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PutAsJsonAsync($"/api/gifts/{Guid.NewGuid()}", hug with { Acorns = 0 }, Json.Options)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await device.PutAsJsonAsync($"/api/gifts/{Guid.NewGuid()}", hug with { ToMemberId = Guid.NewGuid() }, Json.Options)).StatusCode);
+
+        var sync = await Sync(device);
+        var gift = Assert.Single(sync.Gifts);
+        Assert.Equal((GiftKind.Hug, robin, sam, 3, (DateTimeOffset?)null), (gift.Kind, gift.FromMemberId, gift.ToMemberId, gift.Acorns, gift.SeenAt));
+
+        (await device.PostAsync($"/api/gifts/{id}/seen", null)).EnsureSuccessStatusCode();
+        var seen = Assert.Single((await Sync(device, sync.Cursor)).Gifts);
+        Assert.NotNull(seen.SeenAt);
+    }
+
+    [Fact]
     public async Task Wins_are_checked()
     {
         var (_, device, robin, habitId) = await Setup();

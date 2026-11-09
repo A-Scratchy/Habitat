@@ -20,6 +20,7 @@ public class HabitatDb(DbContextOptions<HabitatDb> options, ICurrentHousehold? c
     public DbSet<Room> Rooms => Set<Room>();
     public DbSet<Tend> Tends => Set<Tend>();
     public DbSet<Win> Wins => Set<Win>();
+    public DbSet<Gift> Gifts => Set<Gift>();
 
     /// <summary>Read by the query filters on every query, so it must stay a property of the context.</summary>
     public Guid? CurrentHouseholdId => current?.Id;
@@ -112,6 +113,13 @@ public class HabitatDb(DbContextOptions<HabitatDb> options, ICurrentHousehold? c
                 m.HasKey("WinId", nameof(WinMember.MemberId));
                 m.HasIndex(x => x.MemberId);
             });
+        });
+
+        b.Entity<Gift>(e =>
+        {
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(16);
+            e.HasIndex(x => x.ToMemberId);
+            e.ToTable(t => t.HasCheckConstraint("CK_Gifts_NotToSelf", "[FromMemberId] <> [ToMemberId]"));
         });
 
         foreach (var type in b.Model.GetEntityTypes().Where(t => typeof(HouseholdEntity).IsAssignableFrom(t.ClrType)))

@@ -47,6 +47,9 @@ public record BulkTendsResponse(int Saved, int Skipped);
 
 public record ClaimRequest(Guid MemberId);
 
+/// <summary>How many acorns the bounty pays. Just for fun: nothing is spent to post one.</summary>
+public record BountyRequest(int Acorns);
+
 public static class TendEndpoints
 {
     public static void MapTendEndpoints(this IEndpointRouteBuilder api)
@@ -62,6 +65,8 @@ public static class TendEndpoints
         tends.MapPost("/{id:guid}/restart", Restart).WithSummary("Takes a finished quest off the Completed shelf so it can be done again.");
         tends.MapPut("/{id:guid}/claim", Claim).WithSummary("\"I'll do this today\": holds it for one member until the household's day ends.");
         tends.MapDelete("/{id:guid}/claim", ReleaseClaim);
+        tends.MapPut("/{id:guid}/bounty", PutBounty).WithSummary("Put it on the bounty board, or change its reward. The next win pays it.");
+        tends.MapDelete("/{id:guid}/bounty", RemoveBounty).WithSummary("Take it off the bounty board.");
     }
 
     /// <summary>The habit/quest rules, checked before saving (the database's CHECK constraint is the backstop).</summary>
@@ -325,6 +330,34 @@ public static class TendEndpoints
         if (tend.ClaimMemberId is not null)
         {
             (tend.ClaimMemberId, tend.ClaimDay, tend.UpdatedAt) = (null, null, clock.GetUtcNow());
+            await db.SaveChangesAsync();
+        }
+        return TypedResults.NoContent();
+    }
+
+    /// <summary>The app offers the job's usual acorns ×1 to ×3 (an Elephant at most 15); this leaves room without allowing silly amounts.</summary>
+    public const int MaxBountyAcorns = 50;
+
+    private static async Task<IResult> PutBounty(Guid id, BountyRequest req, HabitatDb db, TimeProvider clock)
+    {
+        if (req.Acorns is < 1 or > MaxBountyAcorns)
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["acorns"] = [$"Between 1 and {MaxBountyAcorns} acorns."] });
+        var tend = await db.Tends.FirstOrDefaultAsync(t => t.Id == id && t.DeletedAt == null);
+        if (tend is null) return TypedResults.NotFound();
+        var now = clock.GetUtcNow();
+        // Changing the reward keeps its place on the board.
+        (tend.BountyAcorns, tend.BountyPostedAt, tend.UpdatedAt) = (req.Acorns, tend.BountyPostedAt ?? now, now);
+        await db.SaveChangesAsync();
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<NoContent, NotFound>> RemoveBounty(Guid id, HabitatDb db, TimeProvider clock)
+    {
+        var tend = await db.Tends.FirstOrDefaultAsync(t => t.Id == id && t.DeletedAt == null);
+        if (tend is null) return TypedResults.NotFound();
+        if (tend.BountyAcorns is not null)
+        {
+            (tend.BountyAcorns, tend.BountyPostedAt, tend.UpdatedAt) = (null, null, clock.GetUtcNow());
             await db.SaveChangesAsync();
         }
         return TypedResults.NoContent();

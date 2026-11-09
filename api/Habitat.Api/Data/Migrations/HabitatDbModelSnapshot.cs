@@ -73,6 +73,61 @@ namespace Habitat.Api.Data.Migrations
                     b.ToTable("Devices");
                 });
 
+            modelBuilder.Entity("Habitat.Api.Data.Gift", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Acorns")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("FromMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("HouseholdId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset?>("SeenAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ToMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HouseholdId");
+
+                    b.HasIndex("RowVersion");
+
+                    b.HasIndex("ToMemberId");
+
+                    b.ToTable("Gifts", t =>
+                        {
+                            t.HasCheckConstraint("CK_Gifts_NotToSelf", "[FromMemberId] <> [ToMemberId]");
+                        });
+                });
+
             modelBuilder.Entity("Habitat.Api.Data.Household", b =>
                 {
                     b.Property<Guid>("Id")
@@ -239,6 +294,12 @@ namespace Habitat.Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int?>("BountyAcorns")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("BountyPostedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<DateOnly?>("ClaimDay")
                         .HasColumnType("date");
 
@@ -389,6 +450,9 @@ namespace Habitat.Api.Data.Migrations
                     b.Property<DateTimeOffset>("At")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<int>("BountyAcorns")
+                        .HasColumnType("int");
+
                     b.Property<bool>("CompletedQuest")
                         .HasColumnType("bit");
 
@@ -445,6 +509,15 @@ namespace Habitat.Api.Data.Migrations
                 });
 
             modelBuilder.Entity("Habitat.Api.Data.Device", b =>
+                {
+                    b.HasOne("Habitat.Api.Data.Household", null)
+                        .WithMany()
+                        .HasForeignKey("HouseholdId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Habitat.Api.Data.Gift", b =>
                 {
                     b.HasOne("Habitat.Api.Data.Household", null)
                         .WithMany()

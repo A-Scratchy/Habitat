@@ -49,6 +49,10 @@ public static class WinEndpoints
         var finishesQuest = tend.Kind == TendKind.Quest && tend.CompletedAt is null;
         if (finishesQuest) tend.CompletedAt = input.At;
 
+        // The first win done since a bounty went up pays it, and takes it off the board.
+        var bounty = tend.BountyAcorns is { } acorns && input.At >= tend.BountyPostedAt ? acorns : 0;
+        if (bounty > 0) (tend.BountyAcorns, tend.BountyPostedAt) = (null, null);
+
         db.Wins.Add(new Win
         {
             Id = id,
@@ -63,6 +67,7 @@ public static class WinEndpoints
             LoggedByDeviceId = principal.DeviceId(),
             Members = [.. memberIds.Select((m, i) => new WinMember { MemberId = m, IsPrimary = i == 0 })],
             CompletedQuest = finishesQuest,
+            BountyAcorns = bounty,
             UpdatedAt = now,
         });
 
@@ -95,6 +100,8 @@ public static class WinEndpoints
         {
             // Undoing the win that finished a quest puts it back on the open list.
             if (win.CompletedQuest && tend.CompletedAt == win.At) (tend.CompletedAt, tend.UpdatedAt) = (null, now);
+            // Undoing the win that paid a bounty puts it back on the board, unless another has gone up since.
+            if (win.BountyAcorns > 0 && tend.BountyAcorns is null) (tend.BountyAcorns, tend.BountyPostedAt, tend.UpdatedAt) = (win.BountyAcorns, win.At, now);
 
             var latestWin = await db.Wins
                 .Where(w => w.TendId == tend.Id && w.Id != id && w.DeletedAt == null)
